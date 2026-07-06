@@ -1,38 +1,38 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowRight, Building2, Check, ShieldCheck, WashingMachine } from "lucide-react";
+import { ArrowRight, Building2, Check, Eye, EyeOff, ShieldCheck, WashingMachine } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { apiFetch } from "@/lib/api";
+import { useToast } from "@/components/toast-provider";
+import { apiFetch, toErrorMessage, type AuthResponse } from "@/lib/api";
 import { useAdminStore } from "@/lib/store";
 
 export default function AdminLoginPage() {
-  const { setToken, setRole } = useAdminStore();
+  const { setToken, setRole, setBranchId } = useAdminStore();
+  const { showToast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [notice, setNotice] = useState<string>();
-  const [rolePreview, setRolePreview] = useState<"SUPER_ADMIN" | "BRANCH_ADMIN">("SUPER_ADMIN");
-  const [form, setForm] = useState({ email: "super@freshfold.ng", password: "password123" });
+  const [form, setForm] = useState({ email: "", password: "" });
 
   async function submit() {
     setIsSubmitting(true);
-    setNotice(undefined);
     try {
-      const result = await apiFetch<{ token: string; user: { role: "SUPER_ADMIN" | "BRANCH_ADMIN" } }>("/api/auth/login", { method: "POST", body: JSON.stringify(form) });
+      const result = await apiFetch<AuthResponse>("/api/auth/login", { method: "POST", body: JSON.stringify(form) });
+      if (result.user.role === "CUSTOMER") throw new Error("Please use an admin account to sign in.");
       window.localStorage.setItem("freshfold_admin_token", result.token);
       window.localStorage.setItem("freshfold_admin_role", result.user.role);
+      if (result.user.branchId) window.localStorage.setItem("freshfold_admin_branch_id", result.user.branchId);
+      else window.localStorage.removeItem("freshfold_admin_branch_id");
       setToken(result.token);
       setRole(result.user.role);
-    } catch {
-      window.localStorage.setItem("freshfold_admin_token", "demo-admin-token");
-      window.localStorage.setItem("freshfold_admin_role", rolePreview);
-      setToken("demo-admin-token");
-      setRole(rolePreview);
-      setNotice("Backend auth is not connected to a database yet, so you are entering the console in demo mode.");
+      setBranchId(result.user.branchId ?? undefined);
+      showToast({ type: "success", title: "Signed in", message: "Opening the operations console now." });
+      window.location.href = "/";
+    } catch (error) {
+      showToast({ type: "error", title: "Could not sign you in", message: toErrorMessage(error) });
     } finally {
       setIsSubmitting(false);
     }
-    window.location.href = "/";
   }
 
   return (
@@ -70,18 +70,9 @@ export default function AdminLoginPage() {
           <h2 className="text-2xl font-bold">Sign in to admin</h2>
           <p className="mt-1 text-sm text-slate-500">This is the only admin entry point. The dashboard starts after authentication.</p>
 
-          {notice && <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">{notice}</div>}
-
           <div className="mt-6 grid gap-4">
             <Field label="Email" value={form.email} onChange={(value) => setForm({ ...form, email: value })} />
             <Field label="Password" type="password" value={form.password} onChange={(value) => setForm({ ...form, password: value })} />
-            <div className="grid grid-cols-2 gap-2 rounded-lg bg-slate-100 p-1">
-              {(["SUPER_ADMIN", "BRANCH_ADMIN"] as const).map((role) => (
-                <button key={role} onClick={() => setRolePreview(role)} className={`h-10 rounded-md text-xs font-bold ${rolePreview === role ? "bg-white shadow-sm" : "text-slate-500"}`}>
-                  {role === "SUPER_ADMIN" ? "Superadmin demo" : "Branch demo"}
-                </button>
-              ))}
-            </div>
           </div>
 
           <Button className="mt-6 h-12 w-full bg-[#102532] hover:bg-[#1b3544]" disabled={isSubmitting} onClick={submit}>
@@ -94,10 +85,19 @@ export default function AdminLoginPage() {
 }
 
 function Field({ label, value, type = "text", onChange }: { label: string; value: string; type?: string; onChange: (value: string) => void }) {
+  const [showPassword, setShowPassword] = useState(false);
+  const isPassword = type === "password";
   return (
     <label className="block text-sm font-semibold text-slate-700">
       {label}
-      <input className="mt-2 h-12 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-[#13a7a5]" value={value} type={type} onChange={(event) => onChange(event.target.value)} />
+      <span className="relative mt-2 block">
+        <input className="h-12 w-full rounded-lg border border-slate-200 bg-white px-3 pr-11 text-sm outline-none focus:border-[#13a7a5]" value={value} type={isPassword && showPassword ? "text" : type} onChange={(event) => onChange(event.target.value)} />
+        {isPassword && (
+          <button type="button" aria-label={showPassword ? "Hide password" : "Show password"} className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100" onClick={() => setShowPassword((current) => !current)}>
+            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+        )}
+      </span>
     </label>
   );
 }
