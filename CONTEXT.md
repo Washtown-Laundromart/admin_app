@@ -13,11 +13,13 @@ Stack:
 - jsPDF for browser-side PDF export
 
 Backend connection:
-- Set `NEXT_PUBLIC_API_BASE_URL` in `.env.local`.
-- During local development it defaults to `http://localhost:4000`.
+- Browser code calls the same-origin Next.js proxy at `/api/freshfold`; it should not call Railway directly.
+- Set `BACKEND_API_BASE_URL` in Vercel/local env for the proxy route. It can fall back to `NEXT_PUBLIC_API_BASE_URL` for compatibility.
+- During local development the proxy defaults to `http://localhost:4000` if no backend URL env is set.
 - Admin app must not hold Paystack/Uber/Bolt/Kwik secrets.
 - Local `.env` points to the Railway backend for integration testing.
 - `npm run dev` and `npm run start` do not pin a port; Next can select another available port.
+- On Vercel, using the `/api/freshfold` proxy avoids browser CORS because Vercel calls Railway server-to-server.
 
 Admin model:
 - One admin app, not separate branch apps.

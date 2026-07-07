@@ -1,5 +1,5 @@
 // Admin should call only the FreshFold backend; courier and payment secrets stay in backend `.env`.
-export const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000").replace(/\/$/, "");
+export const API_BASE_URL = "/api/freshfold";
 
 export type AdminRole = "SUPER_ADMIN" | "BRANCH_ADMIN" | "BRANCH_STAFF";
 
@@ -89,13 +89,13 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}, token
           await new Promise((resolve) => window.setTimeout(resolve, 800));
           continue;
         }
-        throw new Error(`Could not connect to FreshFold at ${API_BASE_URL}. The Railway backend address may be temporarily unreachable from your network. Please try again.`);
+        throw new Error("FreshFold could not reach its server right now. Please try again later.");
       }
       throw error;
     }
   }
 
-  throw new Error(`Could not connect to FreshFold at ${API_BASE_URL}. The Railway backend address may be temporarily unreachable from your network. Please try again.`);
+  throw new Error("FreshFold could not reach its server right now. Please try again later.");
 }
 
 export function toErrorMessage(error: unknown) {
