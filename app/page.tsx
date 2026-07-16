@@ -61,7 +61,9 @@ export default function AdminHome() {
   const [customers, setCustomers] = useState<ApiUser[]>([]);
   const [branchUsers, setBranchUsers] = useState<ApiUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [pricingOrderId, setPricingOrderId] = useState<string>();
   const visibleNavItems = useMemo(() => navItems.filter(([id]) => role === "SUPER_ADMIN" || id !== "branches"), [role]);
+  const pricingOrder = useMemo(() => orders.find((order) => order.id === pricingOrderId), [orders, pricingOrderId]);
 
   useEffect(() => {
     const savedToken = window.localStorage.getItem("freshfold_admin_token");
@@ -113,6 +115,15 @@ export default function AdminHome() {
     window.localStorage.removeItem("freshfold_admin_branch_id");
     setToken("");
     window.location.href = "/login";
+  }
+
+  function mergeOrder(order: Order) {
+    setOrders((current) => current.map((item) => item.id === order.id ? { ...item, ...order } : item));
+  }
+
+  function openPricing(order: Order) {
+    setPricingOrderId(order.id);
+    setView("pricing");
   }
 
   function exportPdf() {
@@ -201,8 +212,9 @@ export default function AdminHome() {
         <div className="space-y-5 p-4 sm:p-6">
           {isLoading && <Card className="border-0 p-5 text-sm text-slate-500 shadow-sm">Loading live admin data...</Card>}
           {view === "dashboard" && <Dashboard cards={cards} analytics={analytics} orders={orders} />}
-          {view === "orders" && <OrdersPipeline orders={orders} />}
-          {view === "billing" && <BillingOps orders={orders} />}
+          {view === "orders" && <OrdersPipeline orders={orders} token={token} onOrderUpdated={mergeOrder} onStartPricing={openPricing} />}
+          {view === "pricing" && pricingOrder && <PricingWorkspace order={pricingOrder} token={token} onBack={() => setView("orders")} onOrderUpdated={mergeOrder} />}
+          {view === "billing" && <BillingOps orders={orders} onStartPricing={openPricing} />}
           {view === "branches" && role === "SUPER_ADMIN" && <BranchManagement branches={branches} branchUsers={branchUsers} token={token} onCreated={(branch) => setBranches((current) => [...current, branch])} onAdminCreated={(user) => setBranchUsers((current) => [user, ...current])} />}
           {view === "notifications" && <NotificationsComposer customers={customers} token={token} />}
           {view === "logistics" && <Logistics orders={orders} />}
@@ -264,7 +276,7 @@ function KpiCard({ label, value, helper }: { label: string; value: string; helpe
   );
 }
 
-function OrdersPipeline({ orders }: { orders: Order[] }) {
+function OrdersPipeline({ orders, token, onOrderUpdated, onStartPricing }: { orders: Order[]; token: string; onOrderUpdated: (order: Order) => void; onStartPricing: (order: Order) => void }) {
   return (
     <div className="grid gap-4 xl:grid-cols-5">
       {orderColumns.map((column) => {
@@ -276,7 +288,7 @@ function OrdersPipeline({ orders }: { orders: Order[] }) {
               <span className="rounded-full bg-cyan-50 px-2 py-1 text-xs font-bold text-cyan-700">{columnOrders.length}</span>
             </div>
             <div className="space-y-3">
-              {columnOrders.map((order) => <OrderCard key={order.id} order={order} />)}
+              {columnOrders.map((order) => <OrderCard key={order.id} order={order} token={token} onOrderUpdated={onOrderUpdated} onStartPricing={onStartPricing} />)}
               {!columnOrders.length && <p className="rounded-lg border border-dashed border-slate-200 p-4 text-sm text-slate-500">No orders in this stage.</p>}
             </div>
           </Card>
@@ -286,12 +298,72 @@ function OrdersPipeline({ orders }: { orders: Order[] }) {
   );
 }
 
-function OrderCard({ order }: { order: Order }) {
+function OrderCard({ order, token, onOrderUpdated, onStartPricing }: { order: Order; token: string; onOrderUpdated: (order: Order) => void; onStartPricing: (order: Order) => void }) {
+  const { showToast } = useToast();
+  const [isUpdating, setIsUpdating] = useState(false);
+  const opensBillWorkspace = order.status === "AWAITING_PAYMENT" || Boolean(order.bill);
+
+  async function updateStatus(status: string, note: string) {
+    setIsUpdating(true);
+    try {
+      const updated = await apiFetch<Order>(`/api/orders/${order.id}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ status, note })
+      }, token);
+      onOrderUpdated(updated);
+      if (status === "PRICING") onStartPricing({ ...order, ...updated });
+      showToast({ type: "success", title: "Order updated", message: `${order.code} is now ${formatStatus(status)}.` });
+    } catch (error) {
+      showToast({ type: "error", title: "Could not update order", message: toErrorMessage(error) });
+    } finally {
+      setIsUpdating(false);
+    }
+  }
+
   return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+    <div
+      className={`rounded-lg border border-slate-200 bg-slate-50 p-4 ${opensBillWorkspace ? "cursor-pointer transition hover:border-[#13a7a5] hover:bg-cyan-50" : ""}`}
+      role={opensBillWorkspace ? "button" : undefined}
+      tabIndex={opensBillWorkspace ? 0 : undefined}
+      onClick={() => {
+        if (opensBillWorkspace) onStartPricing(order);
+      }}
+      onKeyDown={(event) => {
+        if (opensBillWorkspace && (event.key === "Enter" || event.key === " ")) onStartPricing(order);
+      }}
+    >
       <strong className="block">{order.code}</strong>
       <p className="mt-1 text-sm text-slate-500">{order.customer?.fullName ?? "Customer"} · {order.branch?.name ?? "Branch"}</p>
       <p className="mt-2 text-xs font-semibold text-slate-500">{formatStatus(order.status)}</p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {order.status === "PICKUP_REQUESTED" && (
+          <Button className="h-9 px-3 text-xs" disabled={isUpdating} onClick={(event) => {
+            event.stopPropagation();
+            updateStatus("AT_BRANCH", "Test pickup marked as received at branch");
+          }}>
+            <PackageCheck className="h-3.5 w-3.5" /> At branch
+          </Button>
+        )}
+        {order.status === "AT_BRANCH" && (
+          <Button className="h-9 bg-white px-3 text-xs text-[#102532] ring-1 ring-slate-200 hover:bg-slate-50" disabled={isUpdating} onClick={(event) => {
+            event.stopPropagation();
+            updateStatus("PRICING", "Branch started inspection and pricing");
+          }}>
+            <FileText className="h-3.5 w-3.5" /> Start pricing
+          </Button>
+        )}
+        {order.status === "PRICING" && (
+          <Button className="h-9 bg-white px-3 text-xs text-[#102532] ring-1 ring-slate-200 hover:bg-slate-50" onClick={(event) => {
+            event.stopPropagation();
+            onStartPricing(order);
+          }}>
+            <FileText className="h-3.5 w-3.5" /> Open pricing
+          </Button>
+        )}
+        {opensBillWorkspace && (
+          <span className="text-xs font-semibold text-[#13a7a5]">Click to view bill</span>
+        )}
+      </div>
     </div>
   );
 }
@@ -308,17 +380,188 @@ function OrderRow({ order }: { order: Order }) {
   );
 }
 
-function BillingOps({ orders }: { orders: Order[] }) {
+function BillingOps({ orders, onStartPricing }: { orders: Order[]; onStartPricing: (order: Order) => void }) {
   const billable = orders.filter((order) => ["AT_BRANCH", "PRICING", "AWAITING_PAYMENT"].includes(order.status));
   return (
     <Card className="border-0 p-5 shadow-sm">
       <h3 className="text-xl font-bold">Billing queue</h3>
       <p className="mt-1 text-sm text-slate-500">Orders appear here after pickup reaches the branch or when payment is waiting.</p>
       <div className="mt-5 space-y-3">
-        {billable.map((order) => <OrderRow key={order.id} order={order} />)}
+        {billable.map((order) => (
+          <div key={order.id} className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
+            <OrderRow order={order} />
+            <Button className="h-10 px-3" onClick={() => onStartPricing(order)}>
+              <FileText className="h-4 w-4" /> {order.bill ? "View bill" : "Open pricing"}
+            </Button>
+          </div>
+        ))}
         {!billable.length && <EmptyState title="No orders need billing" detail="Branch inspection and Paystack billing actions will appear here." />}
       </div>
     </Card>
+  );
+}
+
+type RequestedItem = { itemType?: string; quantity?: number };
+
+function PricingWorkspace({ order, token, onOrderUpdated, onBack }: { order: Order; token: string; onOrderUpdated: (order: Order) => void; onBack: () => void }) {
+  const { showToast } = useToast();
+  const courierDeliveryFee = order.deliveries?.reduce((sum, delivery) => sum + delivery.fee, 0) ?? 0;
+  const [items, setItems] = useState([{ itemName: "", serviceType: "Wash and fold", quantity: "1", unitPrice: "" }]);
+  const [deliveryFee, setDeliveryFee] = useState(String(order.bill?.deliveryFee ?? courierDeliveryFee));
+  const [isSaving, setIsSaving] = useState(false);
+  const [isResending, setIsResending] = useState(false);
+  const requestedItems = Array.isArray(order.requestedItems) ? order.requestedItems as RequestedItem[] : [];
+  const subtotal = items.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unitPrice || 0), 0);
+  const total = subtotal + Number(deliveryFee || 0);
+
+  function updateItem(index: number, field: keyof typeof items[number], value: string) {
+    setItems((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item));
+  }
+
+  async function saveBill() {
+    const payloadItems = items.map((item) => ({
+      itemName: item.itemName.trim(),
+      serviceType: item.serviceType.trim(),
+      quantity: Number(item.quantity),
+      unitPrice: Number(item.unitPrice)
+    })).filter((item) => item.itemName && item.serviceType && item.quantity > 0 && item.unitPrice >= 0);
+    if (!payloadItems.length) {
+      showToast({ type: "error", title: "Inspection is empty", message: "Add at least one priced clothing item." });
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const bill = await apiFetch<Order["bill"]>(`/api/orders/${order.id}/bill`, {
+        method: "POST",
+        body: JSON.stringify({ items: payloadItems, deliveryFee: Number(deliveryFee || 0) })
+      }, token);
+      onOrderUpdated({ ...order, status: "AWAITING_PAYMENT", bill });
+      showToast({ type: "success", title: "Bill created", message: `${order.code} total is ${formatNaira(bill?.total ?? total)}.` });
+    } catch (error) {
+      showToast({ type: "error", title: "Could not create bill", message: toErrorMessage(error) });
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function resendPaymentLink() {
+    setIsResending(true);
+    try {
+      const bill = await apiFetch<Order["bill"]>(`/api/orders/${order.id}/bill/payment-link`, { method: "POST" }, token);
+      onOrderUpdated({ ...order, status: "AWAITING_PAYMENT", bill });
+      showToast({ type: "success", title: "Payment link resent", message: `A new Paystack link was sent for ${order.code}.` });
+    } catch (error) {
+      showToast({ type: "error", title: "Could not resend link", message: toErrorMessage(error) });
+    } finally {
+      setIsResending(false);
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <button className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-[#102532]" onClick={onBack}>
+            <ArrowLeft className="h-4 w-4" /> Back to orders
+          </button>
+          <p className="text-xs font-bold uppercase text-[#13a7a5]">Inspection pricing</p>
+          <h2 className="mt-1 text-2xl font-bold">{order.code}</h2>
+          <p className="mt-1 text-sm text-slate-500">{order.customer?.fullName ?? "Customer"} · {order.branch?.name ?? "Branch"} · {formatStatus(order.status)}</p>
+        </div>
+        {order.bill?.paystackUrl && (
+          <div className="flex flex-wrap gap-2">
+            <Button className="h-11 bg-white px-3 text-[#102532] ring-1 ring-slate-200 hover:bg-slate-50" disabled={isResending || Boolean(order.bill.paidAt)} onClick={resendPaymentLink}>
+              <Mail className="h-4 w-4" /> Resend link
+            </Button>
+            <a className="inline-flex h-11 items-center justify-center rounded-lg bg-[#102532] px-4 text-sm font-semibold text-white" href={order.bill.paystackUrl} target="_blank" rel="noreferrer">Open payment link</a>
+          </div>
+        )}
+      </div>
+
+      <div className="grid gap-5 xl:grid-cols-[0.85fr_1.15fr]">
+        <Card className="border-0 p-5 shadow-sm">
+          <h3 className="text-lg font-bold">Customer request</h3>
+          <div className="mt-4 grid gap-3 text-sm">
+            <ReadOnlyValue label="Customer" value={`${order.customer?.fullName ?? "Customer"}${order.customer?.phone ? ` · ${order.customer.phone}` : ""}`} />
+            <ReadOnlyValue label="Pickup address" value={order.pickupAddress} />
+            <ReadOnlyValue label="Return address" value={order.dropoffAddress ?? order.pickupAddress} />
+            <ReadOnlyValue label="Fulfillment" value={formatStatus(order.fulfillmentMethod ?? "HOME_DELIVERY")} />
+          </div>
+          <div className="mt-5">
+            <p className="text-xs font-bold uppercase text-slate-400">Submitted items</p>
+            <div className="mt-2 space-y-2">
+              {requestedItems.map((item, index) => (
+                <div key={index} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
+                  <span className="font-semibold">{item.itemType ?? "Item"}</span>
+                  <span className="text-slate-500">Qty {item.quantity ?? 1}</span>
+                </div>
+              ))}
+              {!requestedItems.length && <p className="rounded-lg border border-dashed border-slate-200 p-3 text-sm text-slate-500">No item estimate was submitted.</p>}
+            </div>
+          </div>
+          {order.customerNote && (
+            <div className="mt-5">
+              <p className="text-xs font-bold uppercase text-slate-400">Customer note</p>
+              <p className="mt-2 rounded-lg bg-slate-50 p-3 text-sm text-slate-600 whitespace-pre-wrap">{order.customerNote}</p>
+            </div>
+          )}
+          {!!order.photoUrls?.length && (
+            <div className="mt-5">
+              <p className="text-xs font-bold uppercase text-slate-400">Photos</p>
+              <div className="mt-2 grid grid-cols-2 gap-2">
+                {order.photoUrls.map((url) => <img key={url} className="aspect-square rounded-lg object-cover" src={url} alt="Customer submitted laundry" />)}
+              </div>
+            </div>
+          )}
+        </Card>
+
+        <Card className="border-0 p-5 shadow-sm">
+          <h3 className="text-lg font-bold">Inspected items and pricing</h3>
+          {order.bill ? (
+            <div className="mt-4 rounded-lg bg-slate-50 p-4 text-sm">
+              <p className="font-bold">Bill total: {formatNaira(order.bill.total)}</p>
+              <p className="mt-1 text-slate-500">Cleaning {formatNaira(order.bill.cleaningSubtotal)} · Delivery {formatNaira(order.bill.deliveryFee)}</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button className="h-10 bg-white px-3 text-[#102532] ring-1 ring-slate-200 hover:bg-slate-50" disabled={isResending || Boolean(order.bill.paidAt)} onClick={resendPaymentLink}>
+                  <Mail className="h-4 w-4" /> Resend Paystack link
+                </Button>
+                {order.bill.paystackUrl && <a className="inline-flex h-10 items-center justify-center rounded-lg bg-[#102532] px-3 text-sm font-semibold text-white" href={order.bill.paystackUrl} target="_blank" rel="noreferrer">Open link</a>}
+              </div>
+              <div className="mt-4 space-y-2">
+                {order.bill.items?.map((item) => (
+                  <div key={item.id} className="flex items-center justify-between rounded-lg bg-white px-3 py-2">
+                    <span><strong>{item.itemName}</strong><span className="block text-xs text-slate-500">{item.serviceType} · Qty {item.quantity}</span></span>
+                    <span className="font-semibold">{formatNaira(item.total)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="mt-4 space-y-3">
+              {items.map((item, index) => (
+                <div key={index} className="grid gap-2 rounded-lg bg-slate-50 p-3 sm:grid-cols-[1fr_1fr_80px_120px]">
+                  <Input placeholder="Item inspected" value={item.itemName} onChange={(value) => updateItem(index, "itemName", value)} />
+                  <Input placeholder="Service" value={item.serviceType} onChange={(value) => updateItem(index, "serviceType", value)} />
+                  <Input placeholder="Qty" value={item.quantity} onChange={(value) => updateItem(index, "quantity", value)} type="number" />
+                  <Input placeholder="Unit price" value={item.unitPrice} onChange={(value) => updateItem(index, "unitPrice", value)} type="number" />
+                </div>
+              ))}
+              <div className="grid gap-3 sm:grid-cols-[1fr_auto_auto] sm:items-end">
+                <Input placeholder="Delivery fee" value={deliveryFee} onChange={setDeliveryFee} type="number" />
+                <Button className="h-12 bg-white px-3 text-[#102532] ring-1 ring-slate-200 hover:bg-slate-50" onClick={() => setItems((current) => [...current, { itemName: "", serviceType: "Wash and fold", quantity: "1", unitPrice: "" }])}>
+                  <Plus className="h-4 w-4" /> Item
+                </Button>
+                <Button className="h-12 px-3" disabled={isSaving} onClick={saveBill}>
+                  <CreditCard className="h-4 w-4" /> Create bill
+                </Button>
+              </div>
+              <p className="text-sm font-bold text-slate-600">Total: {formatNaira(total)}</p>
+              {!!courierDeliveryFee && <p className="text-xs font-semibold text-slate-500">Courier fee from delivery provider: {formatNaira(courierDeliveryFee)}</p>}
+            </div>
+          )}
+        </Card>
+      </div>
+    </div>
   );
 }
 

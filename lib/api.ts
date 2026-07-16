@@ -39,6 +39,22 @@ export type Bill = {
   cleaningSubtotal: number;
   paidAt?: string | null;
   paystackUrl?: string | null;
+  items?: Array<{
+    id: string;
+    itemName: string;
+    serviceType: string;
+    quantity: number;
+    unitPrice: number;
+    total: number;
+  }>;
+};
+
+export type DeliveryJob = {
+  id: string;
+  provider: "RELAY" | "BOLT" | "KWIK";
+  leg: "PICKUP_TO_BRANCH" | "BRANCH_TO_CUSTOMER";
+  status: string;
+  fee: number;
 };
 
 export type Order = {
@@ -46,10 +62,15 @@ export type Order = {
   code: string;
   status: string;
   pickupAddress: string;
+  dropoffAddress?: string | null;
+  customerNote?: string | null;
+  fulfillmentMethod?: "STORE_PICKUP" | "HOME_DELIVERY";
+  photoUrls?: string[];
   createdAt: string;
   branch: Branch;
   customer?: ApiUser;
   bill?: Bill | null;
+  deliveries?: DeliveryJob[];
   requestedItems?: unknown;
 };
 
