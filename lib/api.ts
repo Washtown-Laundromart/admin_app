@@ -140,6 +140,9 @@ function friendlyErrorMessage(message?: string) {
   if (normalized.includes("invalid credentials")) return "The email or password is not correct. Please check it and try again.";
   if (normalized.includes("forbidden")) return "Your admin account is not allowed to do that.";
   if (normalized.includes("missing bearer") || normalized.includes("invalid or expired")) return "Your session has expired. Please sign in again.";
+  if (normalized.includes("no_same_day_courier_available")) {
+    return "No same-day courier is available for this route right now. Try again shortly, choose another provider, or arrange this delivery manually.";
+  }
   if (normalized.includes("failed to fetch") || normalized.includes("network") || normalized.includes("can't reach")) {
     return "We could not connect to FreshFold right now. Please check your internet connection and try again.";
   }
