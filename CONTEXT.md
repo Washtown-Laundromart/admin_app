@@ -41,6 +41,7 @@ Implemented UI:
 - The inspection/pricing workspace shows the customer's submitted items, notes, addresses, photos, branch/customer details, and a manual line-item pricing form. Pricing is always entered by branch staff after inspection, not generated automatically.
 - Existing bills open in read-only billed state with inspected line items, total, current Paystack link, and a `Resend Paystack link` action that calls `/api/orders/:id/bill/payment-link`.
 - Delivery fee input preloads from stored courier delivery-job fees when available, while still allowing manual/test courier fee entry if provider dispatch did not complete.
+- Admin order cards can dispatch pickup/return courier jobs through the backend, with Shipbubble as the default provider. Delivery cards show provider, leg, status, fee, external reference, and tracking links so branch teams can track each order.
 - Logistics view shows live courier queues with empty states when no matching orders exist.
 - Branch management can create live branches and branch admin/staff users through backend endpoints.
 - Branch admin creation calls `POST /api/admin/users`; the backend now returns clear JSON errors for duplicate email, inactive/missing branch, and invalid form data.

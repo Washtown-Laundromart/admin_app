@@ -11,6 +11,7 @@ import {
   Download,
   Eye,
   EyeOff,
+  ExternalLink,
   FileText,
   LayoutDashboard,
   Mail,
@@ -49,6 +50,8 @@ const orderColumns = [
   { title: "In cleaning", statuses: ["PAID", "WASHING", "DRYING", "IRONING", "BAGGED"] },
   { title: "Ready", statuses: ["READY", "OUT_FOR_DELIVERY", "DELIVERED", "READY_FOR_PICKUP", "COLLECTED"] }
 ];
+
+const courierProviders = ["SHIPBUBBLE", "RELAY", "KWIK", "BOLT"] as const;
 
 export default function AdminHome() {
   const { role, setRole, token, setToken, setBranchId } = useAdminStore();
@@ -301,7 +304,11 @@ function OrdersPipeline({ orders, token, onOrderUpdated, onStartPricing }: { ord
 function OrderCard({ order, token, onOrderUpdated, onStartPricing }: { order: Order; token: string; onOrderUpdated: (order: Order) => void; onStartPricing: (order: Order) => void }) {
   const { showToast } = useToast();
   const [isUpdating, setIsUpdating] = useState(false);
+  const [provider, setProvider] = useState<(typeof courierProviders)[number]>("SHIPBUBBLE");
+  const [isDispatching, setIsDispatching] = useState(false);
   const opensBillWorkspace = order.status === "AWAITING_PAYMENT" || Boolean(order.bill);
+  const canDispatchPickup = order.status === "PICKUP_REQUESTED";
+  const canDispatchReturn = order.status === "READY" && order.fulfillmentMethod !== "STORE_PICKUP";
 
   async function updateStatus(status: string, note: string) {
     setIsUpdating(true);
@@ -320,6 +327,26 @@ function OrderCard({ order, token, onOrderUpdated, onStartPricing }: { order: Or
     }
   }
 
+  async function dispatchCourier(leg: "PICKUP_TO_BRANCH" | "BRANCH_TO_CUSTOMER") {
+    setIsDispatching(true);
+    try {
+      const result = await apiFetch<{ order: Order }>(`/api/orders/${order.id}/deliveries`, {
+        method: "POST",
+        body: JSON.stringify({ provider, leg })
+      }, token);
+      onOrderUpdated(result.order);
+      showToast({
+        type: "success",
+        title: "Courier dispatched",
+        message: `${provider} tracking is now attached to ${order.code}.`
+      });
+    } catch (error) {
+      showToast({ type: "error", title: "Could not dispatch courier", message: toErrorMessage(error) });
+    } finally {
+      setIsDispatching(false);
+    }
+  }
+
   return (
     <div
       className={`rounded-lg border border-slate-200 bg-slate-50 p-4 ${opensBillWorkspace ? "cursor-pointer transition hover:border-[#13a7a5] hover:bg-cyan-50" : ""}`}
@@ -335,9 +362,40 @@ function OrderCard({ order, token, onOrderUpdated, onStartPricing }: { order: Or
       <strong className="block">{order.code}</strong>
       <p className="mt-1 text-sm text-slate-500">{order.customer?.fullName ?? "Customer"} · {order.branch?.name ?? "Branch"}</p>
       <p className="mt-2 text-xs font-semibold text-slate-500">{formatStatus(order.status)}</p>
+      {!!order.deliveries?.length && (
+        <div className="mt-3 space-y-2">
+          {order.deliveries.map((delivery) => (
+            <div key={delivery.id} className="rounded-md border border-slate-200 bg-white p-2 text-xs">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-bold">{delivery.provider} · {formatDeliveryLeg(delivery.leg)}</span>
+                <span className="text-slate-500">{delivery.status}</span>
+              </div>
+              <p className="mt-1 text-slate-500">{formatNaira(delivery.fee)}</p>
+              {delivery.trackingUrl && (
+                <a className="mt-2 inline-flex items-center gap-1 font-bold text-[#0b817f]" href={delivery.trackingUrl} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>
+                  Track delivery <ExternalLink className="h-3 w-3" />
+                </a>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+      {(canDispatchPickup || canDispatchReturn) && (
+        <div className="mt-3 grid gap-2">
+          <select className="h-9 rounded-md border border-slate-200 bg-white px-2 text-xs font-semibold" value={provider} onClick={(event) => event.stopPropagation()} onChange={(event) => setProvider(event.target.value as typeof provider)}>
+            {courierProviders.map((item) => <option key={item} value={item}>{item}</option>)}
+          </select>
+          <Button className="h-9 px-3 text-xs" disabled={isDispatching} onClick={(event) => {
+            event.stopPropagation();
+            dispatchCourier(canDispatchPickup ? "PICKUP_TO_BRANCH" : "BRANCH_TO_CUSTOMER");
+          }}>
+            <Truck className="h-3.5 w-3.5" /> {isDispatching ? "Dispatching..." : canDispatchPickup ? "Dispatch pickup" : "Dispatch return"}
+          </Button>
+        </div>
+      )}
       <div className="mt-3 flex flex-wrap gap-2">
         {order.status === "PICKUP_REQUESTED" && (
-          <Button className="h-9 px-3 text-xs" disabled={isUpdating} onClick={(event) => {
+          <Button className="h-9 bg-white px-3 text-xs text-[#102532] ring-1 ring-slate-200 hover:bg-slate-50" disabled={isUpdating} onClick={(event) => {
             event.stopPropagation();
             updateStatus("AT_BRANCH", "Test pickup marked as received at branch");
           }}>
@@ -883,12 +941,33 @@ function NotificationsComposer({ customers, token }: { customers: ApiUser[]; tok
 }
 
 function Logistics({ orders }: { orders: Order[] }) {
-  const deliveryOrders = orders.filter((order) => ["PICKUP_COURIER_ASSIGNED", "OUT_FOR_DELIVERY"].includes(order.status));
+  const deliveryOrders = orders.filter((order) => order.deliveries?.length);
   return (
     <Card className="border-0 p-5 shadow-sm">
       <h3 className="text-xl font-bold">Delivery queue</h3>
       <div className="mt-5 space-y-3">
-        {deliveryOrders.map((order) => <OrderRow key={order.id} order={order} />)}
+        {deliveryOrders.map((order) => (
+          <div key={order.id} className="rounded-lg border border-slate-200 bg-white p-4">
+            <OrderRow order={order} />
+            <div className="mt-3 grid gap-2 md:grid-cols-2">
+              {order.deliveries?.map((delivery) => (
+                <div key={delivery.id} className="rounded-md bg-slate-50 p-3 text-sm">
+                  <div className="flex items-center justify-between gap-2">
+                    <strong>{delivery.provider}</strong>
+                    <span className="text-xs font-semibold text-slate-500">{formatDeliveryLeg(delivery.leg)}</span>
+                  </div>
+                  <p className="mt-1 text-slate-500">{delivery.status} · {formatNaira(delivery.fee)}</p>
+                  {delivery.externalDeliveryId && <p className="mt-1 text-xs text-slate-500">Ref: {delivery.externalDeliveryId}</p>}
+                  {delivery.trackingUrl && (
+                    <a className="mt-2 inline-flex items-center gap-1 text-sm font-bold text-[#0b817f]" href={delivery.trackingUrl} target="_blank" rel="noreferrer">
+                      Open tracking <ExternalLink className="h-3.5 w-3.5" />
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
         {!deliveryOrders.length && <EmptyState title="No active courier jobs" detail="Pickup and return delivery jobs will appear here." />}
       </div>
     </Card>
@@ -941,4 +1020,8 @@ function formatNaira(value: number) {
 
 function formatStatus(status: string) {
   return status.replaceAll("_", " ").toLowerCase().replace(/^\w|\s\w/g, (match) => match.toUpperCase());
+}
+
+function formatDeliveryLeg(leg: string) {
+  return leg === "PICKUP_TO_BRANCH" ? "Pickup to branch" : "Return to customer";
 }
