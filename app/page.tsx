@@ -307,7 +307,6 @@ function OrderCard({ order, token, onOrderUpdated, onStartPricing }: { order: Or
   const [provider, setProvider] = useState<(typeof courierProviders)[number]>("SHIPBUBBLE");
   const [isDispatching, setIsDispatching] = useState(false);
   const opensBillWorkspace = order.status === "AWAITING_PAYMENT" || Boolean(order.bill);
-  const canDispatchPickup = order.status === "PICKUP_REQUESTED";
   const canDispatchReturn = order.status === "READY" && order.fulfillmentMethod !== "STORE_PICKUP";
 
   async function updateStatus(status: string, note: string) {
@@ -380,16 +379,16 @@ function OrderCard({ order, token, onOrderUpdated, onStartPricing }: { order: Or
           ))}
         </div>
       )}
-      {(canDispatchPickup || canDispatchReturn) && (
+      {canDispatchReturn && (
         <div className="mt-3 grid gap-2">
           <select className="h-9 rounded-md border border-slate-200 bg-white px-2 text-xs font-semibold" value={provider} onClick={(event) => event.stopPropagation()} onChange={(event) => setProvider(event.target.value as typeof provider)}>
             {courierProviders.map((item) => <option key={item} value={item}>{item}</option>)}
           </select>
           <Button className="h-9 px-3 text-xs" disabled={isDispatching} onClick={(event) => {
             event.stopPropagation();
-            dispatchCourier(canDispatchPickup ? "PICKUP_TO_BRANCH" : "BRANCH_TO_CUSTOMER");
+            dispatchCourier("BRANCH_TO_CUSTOMER");
           }}>
-            <Truck className="h-3.5 w-3.5" /> {isDispatching ? "Dispatching..." : canDispatchPickup ? "Dispatch pickup" : "Dispatch return"}
+            <Truck className="h-3.5 w-3.5" /> {isDispatching ? "Dispatching..." : "Dispatch return"}
           </Button>
         </div>
       )}
