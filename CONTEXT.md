@@ -36,7 +36,7 @@ Implemented UI:
 - Date range controls
 - CSV export calls `/api/admin/export.csv`; PDF export summarizes the currently loaded dashboard cards in-browser.
 - Branch pipeline columns are grouped from live order status values.
-- Order cards can move pickup requests to branch-arrived state, start pricing, and open billed/awaiting-payment orders back into the pricing workspace.
+- Order cards can move pickup-stage orders to branch-arrived state for testing, start pricing, and open billed/awaiting-payment orders back into the pricing workspace.
 - Billing view shows live orders that are at-branch, pricing, or awaiting payment. It opens the same inspection/pricing workspace used from the Orders pipeline.
 - The inspection/pricing workspace shows the customer's submitted items, notes, addresses, photos, branch/customer details, and a manual line-item pricing form. Pricing is always entered by branch staff after inspection, not generated automatically.
 - Existing bills open in read-only billed state with inspected line items, total, current Paystack link, and a `Resend Paystack link` action that calls `/api/orders/:id/bill/payment-link`.

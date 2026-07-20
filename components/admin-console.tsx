@@ -344,6 +344,7 @@ function OrderCard({ order, token, onOrderUpdated, onStartPricing }: { order: Or
   const [isDispatching, setIsDispatching] = useState(false);
   const opensBillWorkspace = order.status === "AWAITING_PAYMENT" || Boolean(order.bill);
   const canDispatchReturn = order.status === "READY" && order.fulfillmentMethod !== "STORE_PICKUP";
+  const canMarkAtBranchForTesting = ["PICKUP_REQUESTED", "PICKUP_COURIER_ASSIGNED", "PICKED_UP"].includes(order.status);
   const canMarkReady = ["PAID", "WASHING", "DRYING", "IRONING", "BAGGED"].includes(order.status);
 
   async function updateStatus(status: string, note: string) {
@@ -430,7 +431,7 @@ function OrderCard({ order, token, onOrderUpdated, onStartPricing }: { order: Or
         </div>
       )}
       <div className="mt-3 flex flex-wrap gap-2">
-        {order.status === "PICKUP_REQUESTED" && (
+        {canMarkAtBranchForTesting && (
           <Button className="h-9 bg-white px-3 text-xs text-[#102532] ring-1 ring-slate-200 hover:bg-slate-50" disabled={isUpdating} onClick={(event) => {
             event.stopPropagation();
             updateStatus("AT_BRANCH", "Test pickup marked as received at branch");
