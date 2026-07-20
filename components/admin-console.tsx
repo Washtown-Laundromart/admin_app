@@ -30,7 +30,7 @@ import jsPDF from "jspdf";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/components/toast-provider";
-import { API_BASE_URL, apiFetch, toErrorMessage, type AdminRole, type AnalyticsResponse, type ApiUser, type AuditLog, type Branch, type Order } from "@/lib/api";
+import { API_BASE_URL, apiFetch, toErrorMessage, type AdminRole, type AnalyticsResponse, type ApiUser, type AuditLog, type AuditLogPage, type Branch, type Order } from "@/lib/api";
 import { useAdminStore } from "@/lib/store";
 
 type AdminPage = "dashboard" | "orders" | "pricing" | "branches" | "notifications" | "logistics" | "billing" | "audit" | "settings";
@@ -77,7 +77,6 @@ export function AdminConsole({ page }: { page: AdminPage }) {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [customers, setCustomers] = useState<ApiUser[]>([]);
   const [branchUsers, setBranchUsers] = useState<ApiUser[]>([]);
-  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [pricingOrderId, setPricingOrderId] = useState<string>();
   const visibleNavItems = useMemo(() => navItems.filter(([id]) => {
@@ -108,20 +107,18 @@ export function AdminConsole({ page }: { page: AdminPage }) {
     if (!currentToken) return;
     if (showLoading) setIsLoading(true);
     try {
-      const [analyticsResult, orderResult, branchResult, branchUserResult, customerResult, auditResult] = await Promise.all([
+      const [analyticsResult, orderResult, branchResult, branchUserResult, customerResult] = await Promise.all([
         apiFetch<AnalyticsResponse>(`/api/admin/analytics?from=${range.from}&to=${range.to}`, {}, currentToken),
         apiFetch<Order[]>("/api/orders", {}, currentToken),
         apiFetch<Branch[]>("/api/branches", {}, currentToken),
         apiFetch<ApiUser[]>("/api/admin/users", {}, currentToken).catch(() => []),
-        apiFetch<ApiUser[]>("/api/admin/customers", {}, currentToken).catch(() => []),
-        role === "SUPER_ADMIN" || role === "BRANCH_ADMIN" ? apiFetch<AuditLog[]>("/api/admin/audit-logs", {}, currentToken).catch(() => []) : Promise.resolve([])
+        apiFetch<ApiUser[]>("/api/admin/customers", {}, currentToken).catch(() => [])
       ]);
       setAnalytics(analyticsResult);
       setOrders(orderResult);
       setBranches(branchResult);
       setBranchUsers(branchUserResult);
       setCustomers(customerResult);
-      setAuditLogs(auditResult);
     } catch (error) {
       showToast({ type: "error", title: "Could not load admin data", message: toErrorMessage(error) });
     } finally {
@@ -269,7 +266,7 @@ export function AdminConsole({ page }: { page: AdminPage }) {
           {view === "branches" && (role === "SUPER_ADMIN" || role === "BRANCH_ADMIN") && <BranchManagement branches={branches} branchUsers={branchUsers} token={token} role={role} assignedBranchId={branchId} onCreated={(branch) => setBranches((current) => [...current, branch])} onAdminCreated={(user) => setBranchUsers((current) => [user, ...current])} />}
           {view === "notifications" && <NotificationsComposer customers={customers} token={token} />}
           {view === "logistics" && <Logistics orders={orders} />}
-          {view === "audit" && <AuditLogs logs={auditLogs} branches={branches} role={role} />}
+          {view === "audit" && <AuditLogs token={token} branches={branches} role={role} />}
           {view === "settings" && <SettingsPanel role={role} />}
         </div>
       </section>
@@ -1064,27 +1061,75 @@ function Logistics({ orders }: { orders: Order[] }) {
   );
 }
 
-function AuditLogs({ logs, branches, role }: { logs: AuditLog[]; branches: Branch[]; role: AdminRole }) {
+function AuditLogs({ token, branches, role }: { token: string; branches: Branch[]; role: AdminRole }) {
+  const { showToast } = useToast();
+  const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [actions, setActions] = useState<string[]>([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState("");
+  const [actionFilter, setActionFilter] = useState("");
   const [branchFilter, setBranchFilter] = useState("");
-  const visibleLogs = logs.filter((log) => !branchFilter || log.branchId === branchFilter);
   const branchName = (id?: string | null) => branches.find((branch) => branch.id === id)?.name ?? "Corporate";
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      const params = new URLSearchParams({
+        page: String(page),
+        pageSize: "20"
+      });
+      if (search.trim()) params.set("search", search.trim());
+      if (branchFilter) params.set("branchId", branchFilter);
+      if (roleFilter) params.set("actorRole", roleFilter);
+      if (actionFilter) params.set("action", actionFilter);
+      apiFetch<AuditLogPage>(`/api/admin/audit-logs?${params.toString()}`, {}, token).then((result) => {
+        setLogs(result.data);
+        setActions(result.actions);
+        setTotal(result.total);
+        setTotalPages(result.totalPages);
+      }).catch((error) => {
+        showToast({ type: "error", title: "Could not load audit logs", message: toErrorMessage(error) });
+      });
+    }, 250);
+    return () => window.clearTimeout(timeout);
+  }, [actionFilter, branchFilter, page, roleFilter, search, showToast, token]);
+
+  function updateFilter(setter: (value: string) => void, value: string) {
+    setter(value);
+    setPage(1);
+  }
 
   return (
     <Card className="border-0 p-5 shadow-sm">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h3 className="text-xl font-bold">Audit logs</h3>
-          <p className="mt-1 text-sm text-slate-500">Admin sign-ins, pricing, dispatches, notifications, branch changes, and user creation.</p>
+          <p className="mt-1 text-sm text-slate-500">{total.toLocaleString()} tracked admin actions. Showing 20 per page.</p>
         </div>
+      </div>
+      <div className="mt-5 grid gap-3 lg:grid-cols-4">
+        <input className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-[#13a7a5]" placeholder="Search logs" value={search} onChange={(event) => updateFilter(setSearch, event.target.value)} />
         {role === "SUPER_ADMIN" && (
-          <select className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm" value={branchFilter} onChange={(event) => setBranchFilter(event.target.value)}>
+          <select className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm" value={branchFilter} onChange={(event) => updateFilter(setBranchFilter, event.target.value)}>
             <option value="">All branches</option>
             {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
           </select>
         )}
+        <select className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm" value={roleFilter} onChange={(event) => updateFilter(setRoleFilter, event.target.value)}>
+          <option value="">All roles</option>
+          <option value="SUPER_ADMIN">Super admins</option>
+          <option value="BRANCH_ADMIN">Branch admins</option>
+          <option value="BRANCH_STAFF">Branch staff</option>
+        </select>
+        <select className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm" value={actionFilter} onChange={(event) => updateFilter(setActionFilter, event.target.value)}>
+          <option value="">All actions</option>
+          {actions.map((action) => <option key={action} value={action}>{formatAuditAction(action)}</option>)}
+        </select>
       </div>
       <div className="mt-5 space-y-3">
-        {visibleLogs.map((log) => (
+        {logs.map((log) => (
           <div key={log.id} className="rounded-lg border border-slate-200 bg-white p-4">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
@@ -1100,7 +1145,14 @@ function AuditLogs({ logs, branches, role }: { logs: AuditLog[]; branches: Branc
             </div>
           </div>
         ))}
-        {!visibleLogs.length && <EmptyState title="No audit logs found" detail="Tracked admin actions will appear here." />}
+        {!logs.length && <EmptyState title="No audit logs found" detail="Try a different search or filter." />}
+      </div>
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 text-sm font-semibold text-slate-500">
+        <span>Page {page} of {totalPages}</span>
+        <div className="flex gap-2">
+          <Button className="h-9 bg-white px-3 text-[#102532] ring-1 ring-slate-200 hover:bg-slate-50" disabled={page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))}>Previous</Button>
+          <Button className="h-9 bg-white px-3 text-[#102532] ring-1 ring-slate-200 hover:bg-slate-50" disabled={page >= totalPages} onClick={() => setPage((current) => Math.min(totalPages, current + 1))}>Next</Button>
+        </div>
       </div>
     </Card>
   );

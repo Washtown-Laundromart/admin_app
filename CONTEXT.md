@@ -52,7 +52,7 @@ Implemented UI:
 - Branch user loading is non-blocking: if `/api/admin/users` is not deployed yet or fails, branch cards and branch dropdowns must still render from `/api/branches`.
 - Branch creation geocodes the entered address/city/state through the backend `POST /api/geocode/address`, which uses Mapbox server-side, shows candidate matches, requires admin confirmation of latitude/longitude, and sends the confirmed coordinates in the `/api/branches` payload.
 - Notifications composer sends real in-app records and Resend email broadcasts to selected live customers through `POST /api/notifications/broadcast`. Push is disabled in the UI until a device-token provider is configured.
-- Audit Logs page shows backend audit entries for admin login/logout, pricing, payment-link resend, status changes, courier dispatch, notification broadcasts, branch creation, and branch-user creation. Super admins can filter all logs by branch; branch admins see only their branch logs.
+- Audit Logs page shows backend audit entries for admin login/logout, pricing, payment-link resend, status changes, courier dispatch, notification broadcasts, branch creation, and branch-user creation. It fetches 20 logs per page and supports search plus branch, actor-role, and action filters. Super admins can filter all logs by branch; branch admins see only their branch logs.
 - App-wide toast notifications live in `components/toast-provider.tsx`; keep messages clear for non-technical admins.
 
 Next tasks:

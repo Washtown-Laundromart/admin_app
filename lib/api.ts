@@ -92,6 +92,15 @@ export type AuditLog = {
   createdAt: string;
 };
 
+export type AuditLogPage = {
+  data: AuditLog[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  actions: string[];
+};
+
 export type AnalyticsResponse = {
   cards: {
     revenue: number;
