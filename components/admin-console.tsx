@@ -30,10 +30,10 @@ import jsPDF from "jspdf";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/components/toast-provider";
-import { API_BASE_URL, apiFetch, toErrorMessage, type AdminRole, type AnalyticsResponse, type ApiUser, type Branch, type Order } from "@/lib/api";
+import { API_BASE_URL, apiFetch, toErrorMessage, type AdminRole, type AnalyticsResponse, type ApiUser, type AuditLog, type Branch, type Order } from "@/lib/api";
 import { useAdminStore } from "@/lib/store";
 
-type AdminPage = "dashboard" | "orders" | "pricing" | "branches" | "notifications" | "logistics" | "billing" | "settings";
+type AdminPage = "dashboard" | "orders" | "pricing" | "branches" | "notifications" | "logistics" | "billing" | "audit" | "settings";
 
 const navItems = [
   ["dashboard", LayoutDashboard, "Dashboard"],
@@ -42,6 +42,7 @@ const navItems = [
   ["notifications", Bell, "Notifications"],
   ["logistics", Route, "Logistics"],
   ["billing", CreditCard, "Billing"],
+  ["audit", FileText, "Audit logs"],
   ["settings", Settings, "Settings"]
 ] as const;
 
@@ -62,11 +63,12 @@ const pagePaths: Record<Exclude<AdminPage, "pricing">, string> = {
   notifications: "/notifications",
   logistics: "/logistics",
   billing: "/billing",
+  audit: "/audit-logs",
   settings: "/settings"
 };
 
 export function AdminConsole({ page }: { page: AdminPage }) {
-  const { role, setRole, token, setToken, setBranchId } = useAdminStore();
+  const { role, setRole, token, setToken, branchId, setBranchId } = useAdminStore();
   const { showToast } = useToast();
   const [view, setView] = useState<AdminPage>(page);
   const [range, setRange] = useState({ from: new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10), to: new Date().toISOString().slice(0, 10) });
@@ -75,9 +77,14 @@ export function AdminConsole({ page }: { page: AdminPage }) {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [customers, setCustomers] = useState<ApiUser[]>([]);
   const [branchUsers, setBranchUsers] = useState<ApiUser[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [pricingOrderId, setPricingOrderId] = useState<string>();
-  const visibleNavItems = useMemo(() => navItems.filter(([id]) => role === "SUPER_ADMIN" || id !== "branches"), [role]);
+  const visibleNavItems = useMemo(() => navItems.filter(([id]) => {
+    if (id === "branches") return role === "SUPER_ADMIN" || role === "BRANCH_ADMIN";
+    if (id === "audit") return role === "SUPER_ADMIN" || role === "BRANCH_ADMIN";
+    return true;
+  }), [role]);
   const pricingOrder = useMemo(() => orders.find((order) => order.id === pricingOrderId), [orders, pricingOrderId]);
 
   useEffect(() => {
@@ -101,18 +108,20 @@ export function AdminConsole({ page }: { page: AdminPage }) {
     if (!currentToken) return;
     if (showLoading) setIsLoading(true);
     try {
-      const [analyticsResult, orderResult, branchResult, branchUserResult, customerResult] = await Promise.all([
+      const [analyticsResult, orderResult, branchResult, branchUserResult, customerResult, auditResult] = await Promise.all([
         apiFetch<AnalyticsResponse>(`/api/admin/analytics?from=${range.from}&to=${range.to}`, {}, currentToken),
         apiFetch<Order[]>("/api/orders", {}, currentToken),
         apiFetch<Branch[]>("/api/branches", {}, currentToken),
         apiFetch<ApiUser[]>("/api/admin/users", {}, currentToken).catch(() => []),
-        apiFetch<ApiUser[]>("/api/admin/customers", {}, currentToken).catch(() => [])
+        apiFetch<ApiUser[]>("/api/admin/customers", {}, currentToken).catch(() => []),
+        role === "SUPER_ADMIN" || role === "BRANCH_ADMIN" ? apiFetch<AuditLog[]>("/api/admin/audit-logs", {}, currentToken).catch(() => []) : Promise.resolve([])
       ]);
       setAnalytics(analyticsResult);
       setOrders(orderResult);
       setBranches(branchResult);
       setBranchUsers(branchUserResult);
       setCustomers(customerResult);
+      setAuditLogs(auditResult);
     } catch (error) {
       showToast({ type: "error", title: "Could not load admin data", message: toErrorMessage(error) });
     } finally {
@@ -134,7 +143,7 @@ export function AdminConsole({ page }: { page: AdminPage }) {
   }, [range.from, range.to, token, page]);
 
   useEffect(() => {
-    if (role !== "SUPER_ADMIN" && view === "branches") window.location.href = "/";
+    if (role === "BRANCH_STAFF" && (view === "branches" || view === "audit")) window.location.href = "/";
   }, [role, view]);
 
   const cards = useMemo(() => [
@@ -144,7 +153,10 @@ export function AdminConsole({ page }: { page: AdminPage }) {
     { label: "Failed handovers", value: String(analytics?.cards.failedHandovers ?? 0), helper: "Courier exceptions" }
   ], [analytics, orders.length]);
 
-  function signOut() {
+  async function signOut() {
+    if (token) {
+      await apiFetch("/api/auth/logout", { method: "POST" }, token).catch(() => undefined);
+    }
     window.localStorage.removeItem("freshfold_admin_token");
     window.localStorage.removeItem("freshfold_admin_role");
     window.localStorage.removeItem("freshfold_admin_branch_id");
@@ -254,9 +266,10 @@ export function AdminConsole({ page }: { page: AdminPage }) {
           {view === "orders" && <OrdersPipeline orders={orders} token={token} onOrderUpdated={mergeOrder} onStartPricing={openPricing} />}
           {view === "pricing" && pricingOrder && <PricingWorkspace order={pricingOrder} token={token} onBack={() => navigate("orders")} onOrderUpdated={mergeOrder} />}
           {view === "billing" && <BillingOps orders={orders} onStartPricing={openPricing} />}
-          {view === "branches" && role === "SUPER_ADMIN" && <BranchManagement branches={branches} branchUsers={branchUsers} token={token} onCreated={(branch) => setBranches((current) => [...current, branch])} onAdminCreated={(user) => setBranchUsers((current) => [user, ...current])} />}
+          {view === "branches" && (role === "SUPER_ADMIN" || role === "BRANCH_ADMIN") && <BranchManagement branches={branches} branchUsers={branchUsers} token={token} role={role} assignedBranchId={branchId} onCreated={(branch) => setBranches((current) => [...current, branch])} onAdminCreated={(user) => setBranchUsers((current) => [user, ...current])} />}
           {view === "notifications" && <NotificationsComposer customers={customers} token={token} />}
           {view === "logistics" && <Logistics orders={orders} />}
+          {view === "audit" && <AuditLogs logs={auditLogs} branches={branches} role={role} />}
           {view === "settings" && <SettingsPanel role={role} />}
         </div>
       </section>
@@ -509,16 +522,31 @@ type RequestedItem = { itemType?: string; quantity?: number };
 function PricingWorkspace({ order, token, onOrderUpdated, onBack }: { order: Order; token: string; onOrderUpdated: (order: Order) => void; onBack: () => void }) {
   const { showToast } = useToast();
   const courierDeliveryFee = order.deliveries?.reduce((sum, delivery) => sum + delivery.fee, 0) ?? 0;
-  const [items, setItems] = useState([{ itemName: "", serviceType: "Wash and fold", quantity: "1", unitPrice: "" }]);
+  const requestedItems = Array.isArray(order.requestedItems) ? order.requestedItems as RequestedItem[] : [];
+  const submittedItemNames = Array.from(new Set(requestedItems.map((item) => item.itemType).filter(Boolean))) as string[];
+  const initialItemName = submittedItemNames[0] ?? "";
+  const [items, setItems] = useState([{ itemName: initialItemName, serviceType: "Wash and fold", quantity: "1", unitPrice: "" }]);
   const [deliveryFee, setDeliveryFee] = useState(String(order.bill?.deliveryFee ?? courierDeliveryFee));
   const [isSaving, setIsSaving] = useState(false);
   const [isResending, setIsResending] = useState(false);
-  const requestedItems = Array.isArray(order.requestedItems) ? order.requestedItems as RequestedItem[] : [];
   const subtotal = items.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unitPrice || 0), 0);
   const total = subtotal + Number(deliveryFee || 0);
 
+  useEffect(() => {
+    if (order.bill) return;
+    setItems([{ itemName: initialItemName, serviceType: "Wash and fold", quantity: "1", unitPrice: "" }]);
+    setDeliveryFee(String(courierDeliveryFee));
+  }, [courierDeliveryFee, initialItemName, order.bill, order.id]);
+
   function updateItem(index: number, field: keyof typeof items[number], value: string) {
     setItems((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item));
+  }
+
+  function addPricingItem() {
+    setItems((current) => {
+      const nextName = submittedItemNames.find((name) => !current.some((item) => item.itemName === name)) ?? submittedItemNames[0] ?? "";
+      return [...current, { itemName: nextName, serviceType: "Wash and fold", quantity: "1", unitPrice: "" }];
+    });
   }
 
   async function saveBill() {
@@ -643,7 +671,13 @@ function PricingWorkspace({ order, token, onOrderUpdated, onBack }: { order: Ord
             <div className="mt-4 space-y-3">
               {items.map((item, index) => (
                 <div key={index} className="grid gap-2 rounded-lg bg-slate-50 p-3 sm:grid-cols-[1fr_1fr_80px_120px]">
-                  <Input placeholder="Item inspected" value={item.itemName} onChange={(value) => updateItem(index, "itemName", value)} />
+                  {submittedItemNames.length ? (
+                    <select className="h-12 rounded-lg border border-slate-200 bg-white px-3 text-sm" value={item.itemName} onChange={(event) => updateItem(index, "itemName", event.target.value)}>
+                      {submittedItemNames.map((name) => <option key={name} value={name}>{name}</option>)}
+                    </select>
+                  ) : (
+                    <Input placeholder="Item inspected" value={item.itemName} onChange={(value) => updateItem(index, "itemName", value)} />
+                  )}
                   <Input placeholder="Service" value={item.serviceType} onChange={(value) => updateItem(index, "serviceType", value)} />
                   <Input placeholder="Qty" value={item.quantity} onChange={(value) => updateItem(index, "quantity", value)} type="number" />
                   <Input placeholder="Unit price" value={item.unitPrice} onChange={(value) => updateItem(index, "unitPrice", value)} type="number" />
@@ -651,7 +685,7 @@ function PricingWorkspace({ order, token, onOrderUpdated, onBack }: { order: Ord
               ))}
               <div className="grid gap-3 sm:grid-cols-[1fr_auto_auto] sm:items-end">
                 <Input placeholder="Delivery fee" value={deliveryFee} onChange={setDeliveryFee} type="number" />
-                <Button className="h-12 bg-white px-3 text-[#102532] ring-1 ring-slate-200 hover:bg-slate-50" onClick={() => setItems((current) => [...current, { itemName: "", serviceType: "Wash and fold", quantity: "1", unitPrice: "" }])}>
+                <Button className="h-12 bg-white px-3 text-[#102532] ring-1 ring-slate-200 hover:bg-slate-50" onClick={addPricingItem}>
                   <Plus className="h-4 w-4" /> Item
                 </Button>
                 <Button className="h-12 px-3" disabled={isSaving} onClick={saveBill}>
@@ -668,28 +702,33 @@ function PricingWorkspace({ order, token, onOrderUpdated, onBack }: { order: Ord
   );
 }
 
-function BranchManagement({ branches, branchUsers, token, onCreated, onAdminCreated }: { branches: Branch[]; branchUsers: ApiUser[]; token: string; onCreated: (branch: Branch) => void; onAdminCreated: (user: ApiUser) => void }) {
+function BranchManagement({ branches, branchUsers, token, role, assignedBranchId, onCreated, onAdminCreated }: { branches: Branch[]; branchUsers: ApiUser[]; token: string; role: AdminRole; assignedBranchId?: string; onCreated: (branch: Branch) => void; onAdminCreated: (user: ApiUser) => void }) {
   const { showToast } = useToast();
+  const canCreateBranches = role === "SUPER_ADMIN";
+  const manageableBranches = useMemo(() => canCreateBranches ? branches : branches.filter((branch) => branch.id === assignedBranchId), [assignedBranchId, branches, canCreateBranches]);
   const [branchForm, setBranchForm] = useState({ name: "", slug: "", address: "", city: "", state: "", latitude: "", longitude: "", phone: "" });
   const [geocodeResults, setGeocodeResults] = useState<Array<{ label: string; latitude: string; longitude: string }>>([]);
   const [isGeocoding, setIsGeocoding] = useState(false);
-  const [adminForm, setAdminForm] = useState({ fullName: "", email: "", phone: "", password: "", branchId: "", role: "BRANCH_ADMIN" as "BRANCH_ADMIN" | "BRANCH_STAFF" });
-  const [selectedBranchId, setSelectedBranchId] = useState(branches[0]?.id ?? "");
+  const [adminForm, setAdminForm] = useState({ fullName: "", email: "", phone: "", password: "", branchId: assignedBranchId ?? "", role: "BRANCH_ADMIN" as "BRANCH_ADMIN" | "BRANCH_STAFF" });
+  const [selectedBranchId, setSelectedBranchId] = useState(manageableBranches[0]?.id ?? "");
   const [branchPage, setBranchPage] = useState(1);
   const pageSize = 6;
-  const pageCount = Math.max(1, Math.ceil(branches.length / pageSize));
-  const visibleBranches = branches.slice((branchPage - 1) * pageSize, branchPage * pageSize);
+  const pageCount = Math.max(1, Math.ceil(manageableBranches.length / pageSize));
+  const visibleBranches = manageableBranches.slice((branchPage - 1) * pageSize, branchPage * pageSize);
 
   useEffect(() => {
-    if (!branches.length) {
+    if (!manageableBranches.length) {
       setSelectedBranchId("");
       return;
     }
-    if (!selectedBranchId || !branches.some((branch) => branch.id === selectedBranchId)) {
-      setSelectedBranchId(branches[0].id);
+    if (!selectedBranchId || !manageableBranches.some((branch) => branch.id === selectedBranchId)) {
+      setSelectedBranchId(manageableBranches[0].id);
     }
-    setBranchPage((current) => Math.min(current, Math.max(1, Math.ceil(branches.length / pageSize))));
-  }, [branches, selectedBranchId]);
+    if (!canCreateBranches && assignedBranchId) {
+      setAdminForm((current) => ({ ...current, branchId: assignedBranchId, role: "BRANCH_STAFF" }));
+    }
+    setBranchPage((current) => Math.min(current, Math.max(1, Math.ceil(manageableBranches.length / pageSize))));
+  }, [manageableBranches, selectedBranchId, canCreateBranches, assignedBranchId]);
 
   async function createBranch() {
     try {
@@ -745,16 +784,21 @@ function BranchManagement({ branches, branchUsers, token, onCreated, onAdminCrea
   }
 
   async function createAdmin() {
-    if (!adminForm.fullName || !adminForm.email || !adminForm.password || !adminForm.branchId) {
+    const payload = {
+      ...adminForm,
+      branchId: canCreateBranches ? adminForm.branchId : assignedBranchId ?? "",
+      role: canCreateBranches ? adminForm.role : "BRANCH_STAFF"
+    };
+    if (!payload.fullName || !payload.email || !payload.password || !payload.branchId) {
       showToast({ type: "error", title: "Admin details incomplete", message: "Enter the name, email, temporary password, and select a branch." });
       return;
     }
     try {
-      const user = await apiFetch<ApiUser>("/api/admin/users", { method: "POST", body: JSON.stringify(adminForm) }, token);
+      const user = await apiFetch<ApiUser>("/api/admin/users", { method: "POST", body: JSON.stringify(payload) }, token);
       onAdminCreated(user);
-      setSelectedBranchId(user.branchId ?? adminForm.branchId);
-      setAdminForm({ fullName: "", email: "", phone: "", password: "", branchId: "", role: "BRANCH_ADMIN" });
-      showToast({ type: "success", title: "Admin created", message: "The branch user can now sign in. Their login details will be sent by email once Resend is verified." });
+      setSelectedBranchId(user.branchId ?? payload.branchId);
+      setAdminForm({ fullName: "", email: "", phone: "", password: "", branchId: canCreateBranches ? "" : assignedBranchId ?? "", role: canCreateBranches ? "BRANCH_ADMIN" : "BRANCH_STAFF" });
+      showToast({ type: "success", title: "User created", message: "The branch user can now sign in. Their login details will be sent by email once Resend is verified." });
     } catch (error) {
       showToast({ type: "error", title: "Could not create admin", message: toErrorMessage(error) });
     }
@@ -763,7 +807,7 @@ function BranchManagement({ branches, branchUsers, token, onCreated, onAdminCrea
   return (
     <div className="space-y-5">
       <div className="grid gap-5 xl:grid-cols-[1fr_1fr]">
-        <Card className="border-0 p-5 shadow-sm">
+        {canCreateBranches && <Card className="border-0 p-5 shadow-sm">
           <h3 className="flex items-center gap-2 text-xl font-bold"><Plus className="h-5 w-5 text-[#13a7a5]" />Create branch</h3>
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
             <Input placeholder="Branch name" value={branchForm.name} onChange={(name) => setBranchForm({ ...branchForm, name })} />
@@ -803,30 +847,30 @@ function BranchManagement({ branches, branchUsers, token, onCreated, onAdminCrea
             <ReadOnlyValue label="Longitude" value={branchForm.longitude || "Not confirmed"} />
             <Button className="h-12 sm:col-span-2" onClick={createBranch}>Create branch</Button>
           </div>
-        </Card>
+        </Card>}
         <Card className="border-0 p-5 shadow-sm">
-          <h3 className="flex items-center gap-2 text-xl font-bold"><UserPlus className="h-5 w-5 text-[#13a7a5]" />Create branch admin</h3>
+          <h3 className="flex items-center gap-2 text-xl font-bold"><UserPlus className="h-5 w-5 text-[#13a7a5]" />{canCreateBranches ? "Create branch user" : "Create branch staff"}</h3>
           <p className="mt-2 text-sm text-slate-500">Use an email that is not already registered as a customer or admin.</p>
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
             <Input placeholder="Full name" value={adminForm.fullName} onChange={(fullName) => setAdminForm({ ...adminForm, fullName })} />
             <Input placeholder="Email" value={adminForm.email} onChange={(email) => setAdminForm({ ...adminForm, email })} />
             <Input placeholder="Phone" value={adminForm.phone} onChange={(phone) => setAdminForm({ ...adminForm, phone })} />
             <Input placeholder="Temporary password" value={adminForm.password} onChange={(password) => setAdminForm({ ...adminForm, password })} type="password" />
-            <select className="h-12 rounded-lg border border-slate-200 px-3 text-sm sm:col-span-2" value={adminForm.branchId} onChange={(event) => setAdminForm({ ...adminForm, branchId: event.target.value })}>
+            {canCreateBranches ? <select className="h-12 rounded-lg border border-slate-200 px-3 text-sm sm:col-span-2" value={adminForm.branchId} onChange={(event) => setAdminForm({ ...adminForm, branchId: event.target.value })}>
               <option value="">Select branch</option>
               {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
-            </select>
-            <select className="h-12 rounded-lg border border-slate-200 px-3 text-sm sm:col-span-2" value={adminForm.role} onChange={(event) => setAdminForm({ ...adminForm, role: event.target.value as "BRANCH_ADMIN" | "BRANCH_STAFF" })}>
+            </select> : <ReadOnlyValue label="Branch" value={manageableBranches[0]?.name ?? "Assigned branch"} />}
+            {canCreateBranches ? <select className="h-12 rounded-lg border border-slate-200 px-3 text-sm sm:col-span-2" value={adminForm.role} onChange={(event) => setAdminForm({ ...adminForm, role: event.target.value as "BRANCH_ADMIN" | "BRANCH_STAFF" })}>
               <option value="BRANCH_ADMIN">Branch admin</option>
               <option value="BRANCH_STAFF">Branch staff</option>
-            </select>
-            <Button className="h-12 sm:col-span-2" onClick={createAdmin}>Create admin</Button>
+            </select> : <ReadOnlyValue label="Role" value="Branch staff" />}
+            <Button className="h-12 sm:col-span-2" onClick={createAdmin}>Create user</Button>
           </div>
         </Card>
       </div>
 
       <BranchDirectory
-        branches={branches}
+        branches={manageableBranches}
         branchUsers={branchUsers}
         page={branchPage}
         pageCount={pageCount}
@@ -952,7 +996,7 @@ function NotificationsComposer({ customers, token }: { customers: ApiUser[]; tok
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h2 className="text-2xl font-bold">Send notification</h2>
-            <p className="mt-1 text-sm text-slate-500">Send in-app, email, or push notification records to real customer accounts.</p>
+            <p className="mt-1 text-sm text-slate-500">Send in-app and email notifications to real customer accounts.</p>
           </div>
           <Button className="w-full sm:w-auto" disabled={!selectedUserIds.length || !title || !body} onClick={sendNotification}><Bell className="h-4 w-4" /> Send</Button>
         </div>
@@ -964,8 +1008,9 @@ function NotificationsComposer({ customers, token }: { customers: ApiUser[]; tok
         <div className="mt-5 grid gap-3 sm:grid-cols-3">
           <Channel checked={channels.inApp} label="In-app" icon={<Bell />} onClick={() => setChannels({ ...channels, inApp: !channels.inApp })} />
           <Channel checked={channels.email} label="Email" icon={<Mail />} onClick={() => setChannels({ ...channels, email: !channels.email })} />
-          <Channel checked={channels.push} label="Push" icon={<Bell />} onClick={() => setChannels({ ...channels, push: !channels.push })} />
+          <Channel checked={channels.push} label="Push pending" icon={<Bell />} disabled onClick={() => undefined} />
         </div>
+        <p className="mt-3 text-xs font-semibold text-slate-500">Push delivery needs a device-token provider such as FCM/APNs before it can be enabled.</p>
       </Card>
       <Card className="border-0 p-5 shadow-sm">
         <p className="text-sm font-bold uppercase text-[#13a7a5]">Audience</p>
@@ -1019,6 +1064,48 @@ function Logistics({ orders }: { orders: Order[] }) {
   );
 }
 
+function AuditLogs({ logs, branches, role }: { logs: AuditLog[]; branches: Branch[]; role: AdminRole }) {
+  const [branchFilter, setBranchFilter] = useState("");
+  const visibleLogs = logs.filter((log) => !branchFilter || log.branchId === branchFilter);
+  const branchName = (id?: string | null) => branches.find((branch) => branch.id === id)?.name ?? "Corporate";
+
+  return (
+    <Card className="border-0 p-5 shadow-sm">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h3 className="text-xl font-bold">Audit logs</h3>
+          <p className="mt-1 text-sm text-slate-500">Admin sign-ins, pricing, dispatches, notifications, branch changes, and user creation.</p>
+        </div>
+        {role === "SUPER_ADMIN" && (
+          <select className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm" value={branchFilter} onChange={(event) => setBranchFilter(event.target.value)}>
+            <option value="">All branches</option>
+            {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+          </select>
+        )}
+      </div>
+      <div className="mt-5 space-y-3">
+        {visibleLogs.map((log) => (
+          <div key={log.id} className="rounded-lg border border-slate-200 bg-white p-4">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="font-bold">{log.summary}</p>
+                <p className="mt-1 text-sm text-slate-500">{formatAuditAction(log.action)} · {branchName(log.branchId)}</p>
+              </div>
+              <span className="text-xs font-semibold text-slate-500">{new Date(log.createdAt).toLocaleString()}</span>
+            </div>
+            <div className="mt-3 grid gap-2 text-sm sm:grid-cols-3">
+              <ReadOnlyValue label="Actor" value={log.actorName || log.actorEmail || "System"} />
+              <ReadOnlyValue label="Role" value={formatStatus(log.actorRole ?? "SYSTEM")} />
+              <ReadOnlyValue label="Target" value={[log.targetType, log.targetId].filter(Boolean).join(" · ") || "None"} />
+            </div>
+          </div>
+        ))}
+        {!visibleLogs.length && <EmptyState title="No audit logs found" detail="Tracked admin actions will appear here." />}
+      </div>
+    </Card>
+  );
+}
+
 function SettingsPanel({ role }: { role: string }) {
   return <Card className="border-0 p-5 shadow-sm"><h3 className="text-xl font-bold">Settings</h3><p className="mt-2 text-slate-500">{role === "SUPER_ADMIN" ? "Global business settings, branch provisioning, courier billing and admin permissions." : "Branch profile, staff users, service pricing and notification preferences."}</p></Card>;
 }
@@ -1051,8 +1138,8 @@ function ReadOnlyValue({ label, value }: { label: string; value: string }) {
   );
 }
 
-function Channel({ checked, label, icon, onClick }: { checked: boolean; label: string; icon: React.ReactNode; onClick: () => void }) {
-  return <button onClick={onClick} className={`flex items-center gap-3 rounded-lg border p-3 text-left text-sm font-semibold ${checked ? "border-[#13a7a5] bg-cyan-50 text-[#102532]" : "border-slate-200 bg-white text-slate-500"}`}><span className="text-[#13a7a5]">{icon}</span>{label}</button>;
+function Channel({ checked, label, icon, disabled, onClick }: { checked: boolean; label: string; icon: React.ReactNode; disabled?: boolean; onClick: () => void }) {
+  return <button disabled={disabled} onClick={onClick} className={`flex items-center gap-3 rounded-lg border p-3 text-left text-sm font-semibold ${disabled ? "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400" : checked ? "border-[#13a7a5] bg-cyan-50 text-[#102532]" : "border-slate-200 bg-white text-slate-500"}`}><span className={disabled ? "text-slate-400" : "text-[#13a7a5]"}>{icon}</span>{label}</button>;
 }
 
 function EmptyState({ title, detail }: { title: string; detail: string }) {
@@ -1065,6 +1152,10 @@ function formatNaira(value: number) {
 
 function formatStatus(status: string) {
   return status.replaceAll("_", " ").toLowerCase().replace(/^\w|\s\w/g, (match) => match.toUpperCase());
+}
+
+function formatAuditAction(action: string) {
+  return formatStatus(action);
 }
 
 function formatDeliveryLeg(leg: string) {

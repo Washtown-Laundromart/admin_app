@@ -25,7 +25,7 @@ Admin model:
 - One admin app, not separate branch apps.
 - `SUPER_ADMIN` sees all branches and corporate analytics.
 - `BRANCH_ADMIN` and `BRANCH_STAFF` see only their assigned branch because the backend scopes their token by `branchId`.
-- `BRANCH_ADMIN` and `BRANCH_STAFF` must not see the Branches tab; branch provisioning and branch user management are super-admin-only UI areas.
+- `BRANCH_ADMIN` can see the Branches tab only for staff management in their assigned branch. `BRANCH_STAFF` must not see Branches or Audit logs. Branch provisioning remains super-admin-only.
 
 Implemented UI:
 - Separate `/login` admin entry screen
@@ -38,23 +38,24 @@ Implemented UI:
 - Branch pipeline columns are grouped from live order status values.
 - Order cards can move pickup-stage orders to branch-arrived state for testing, start pricing, and open billed/awaiting-payment orders back into the pricing workspace.
 - Billing view shows live orders that are at-branch, pricing, or awaiting payment. It opens the same inspection/pricing workspace used from the Orders pipeline.
-- The inspection/pricing workspace shows the customer's submitted items, notes, addresses, photos, branch/customer details, and a manual line-item pricing form. Pricing is always entered by branch staff after inspection, not generated automatically.
+- The inspection/pricing workspace shows the customer's submitted items, notes, addresses, photos, branch/customer details, and a manual line-item pricing form. Each priced line selects from the customer's submitted item types with a dropdown, then branch staff enters service, quantity, and price after inspection.
 - Existing bills open in read-only billed state with inspected line items, total, current Paystack link, and a `Resend Paystack link` action that calls `/api/orders/:id/bill/payment-link`.
 - Delivery fee input preloads from stored courier delivery-job fees when available, while still allowing manual/test courier fee entry if provider dispatch did not complete.
 - Customer wash requests trigger pickup courier dispatch from the backend immediately. Admin order cards show pickup tracking details and only expose courier dispatch for return delivery when an order is ready.
 - Orders in cleaning states (`PAID`, `WASHING`, `DRYING`, `IRONING`, `BAGGED`) can be marked `READY` directly from the order card after cleaning is complete.
-- Admin console now has route-backed pages (`/orders`, `/billing`, `/logistics`, `/branches`, `/notifications`, `/settings`) using a shared `AdminConsole` component. Entering a page fetches fresh backend data, and operational pages poll backend data so payment/order status changes appear without manual refresh.
+- Admin console now has route-backed pages (`/orders`, `/billing`, `/logistics`, `/branches`, `/notifications`, `/audit-logs`, `/settings`) using a shared `AdminConsole` component. Entering a page fetches fresh backend data, and operational pages poll backend data so payment/order status changes appear without manual refresh.
 - Logistics view shows live courier queues with empty states when no matching orders exist.
-- Branch management can create live branches and branch admin/staff users through backend endpoints.
+- Branch management can create live branches and branch admin/staff users through backend endpoints. Super admins can create branches and branch admins/staff; branch admins can create only staff in their assigned branch.
 - Branch admin creation calls `POST /api/admin/users`; the backend now returns clear JSON errors for duplicate email, inactive/missing branch, and invalid form data.
 - Admin/customer auth uses one backend `User` table, so an email already registered as a customer cannot be reused for a branch admin/staff account.
 - Branch management loads `GET /api/admin/users` and shows active branches as paginated cards below the forms; selecting a branch shows its assigned branch admin and staff users.
 - Branch user loading is non-blocking: if `/api/admin/users` is not deployed yet or fails, branch cards and branch dropdowns must still render from `/api/branches`.
 - Branch creation geocodes the entered address/city/state through the backend `POST /api/geocode/address`, which uses Mapbox server-side, shows candidate matches, requires admin confirmation of latitude/longitude, and sends the confirmed coordinates in the `/api/branches` payload.
-- Notifications composer sends real broadcast records to selected live customers through `POST /api/notifications/broadcast`.
+- Notifications composer sends real in-app records and Resend email broadcasts to selected live customers through `POST /api/notifications/broadcast`. Push is disabled in the UI until a device-token provider is configured.
+- Audit Logs page shows backend audit entries for admin login/logout, pricing, payment-link resend, status changes, courier dispatch, notification broadcasts, branch creation, and branch-user creation. Super admins can filter all logs by branch; branch admins see only their branch logs.
 - App-wide toast notifications live in `components/toast-provider.tsx`; keep messages clear for non-technical admins.
 
 Next tasks:
 - Add server-generated PDF endpoint if audit-grade exports are required.
 - Add service catalog/preset pricing if Washtownnig wants standardized item/service price suggestions; manual inspection pricing remains the source of truth.
-- Connect real email/push providers server-side; current notification composer creates in-app/email/push records only.
+- Connect a real push provider server-side; email broadcasts now use Resend when configured.

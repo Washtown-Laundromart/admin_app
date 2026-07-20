@@ -78,6 +78,20 @@ export type Order = {
   requestedItems?: unknown;
 };
 
+export type AuditLog = {
+  id: string;
+  actorName?: string | null;
+  actorEmail?: string | null;
+  actorRole?: AdminRole | "CUSTOMER" | null;
+  branchId?: string | null;
+  action: string;
+  targetType?: string | null;
+  targetId?: string | null;
+  summary: string;
+  metadata?: unknown;
+  createdAt: string;
+};
+
 export type AnalyticsResponse = {
   cards: {
     revenue: number;
