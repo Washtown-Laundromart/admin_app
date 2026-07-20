@@ -344,6 +344,7 @@ function OrderCard({ order, token, onOrderUpdated, onStartPricing }: { order: Or
   const [isDispatching, setIsDispatching] = useState(false);
   const opensBillWorkspace = order.status === "AWAITING_PAYMENT" || Boolean(order.bill);
   const canDispatchReturn = order.status === "READY" && order.fulfillmentMethod !== "STORE_PICKUP";
+  const canMarkReady = ["PAID", "WASHING", "DRYING", "IRONING", "BAGGED"].includes(order.status);
 
   async function updateStatus(status: string, note: string) {
     setIsUpdating(true);
@@ -451,6 +452,14 @@ function OrderCard({ order, token, onOrderUpdated, onStartPricing }: { order: Or
             onStartPricing(order);
           }}>
             <FileText className="h-3.5 w-3.5" /> Open pricing
+          </Button>
+        )}
+        {canMarkReady && (
+          <Button className="h-9 bg-white px-3 text-xs text-[#102532] ring-1 ring-slate-200 hover:bg-slate-50" disabled={isUpdating} onClick={(event) => {
+            event.stopPropagation();
+            updateStatus("READY", "Branch marked cleaning complete and order ready");
+          }}>
+            <PackageCheck className="h-3.5 w-3.5" /> Mark ready
           </Button>
         )}
         {opensBillWorkspace && (
