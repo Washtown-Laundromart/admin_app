@@ -51,7 +51,7 @@ export type Bill = {
 
 export type DeliveryJob = {
   id: string;
-  provider: "RELAY" | "BOLT" | "KWIK" | "SHIPBUBBLE";
+  provider: "RELAY" | "SHIPBUBBLE";
   leg: "PICKUP_TO_BRANCH" | "BRANCH_TO_CUSTOMER";
   status: string;
   fee: number;

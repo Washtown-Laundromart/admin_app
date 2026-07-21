@@ -54,7 +54,7 @@ const orderColumns = [
   { title: "Ready", statuses: ["READY", "OUT_FOR_DELIVERY", "DELIVERED", "READY_FOR_PICKUP", "COLLECTED"] }
 ];
 
-const courierProviders = ["SHIPBUBBLE", "RELAY", "KWIK", "BOLT"] as const;
+const courierProviders = ["SHIPBUBBLE", "RELAY"] as const;
 
 const pagePaths: Record<Exclude<AdminPage, "pricing">, string> = {
   dashboard: "/",
@@ -201,10 +201,10 @@ export function AdminConsole({ page }: { page: AdminPage }) {
   if (!token) return null;
 
   return (
-    <main className="min-h-screen bg-[#f6f8f8] text-[#102532]">
+    <main className="min-h-screen bg-[#f4f7fb] text-[#0b4ea2]">
       <aside className="fixed left-0 top-0 hidden h-screen w-[280px] border-r border-slate-200 bg-white lg:block">
         <div className="flex h-screen flex-col p-4">
-          <div className="flex items-center gap-3 rounded-lg bg-[#102532] p-4 text-white">
+          <div className="flex items-center gap-3 rounded-lg bg-[#0b4ea2] p-4 text-white">
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-white p-1.5">
               <img src="/washtownlogo.png" alt="Washtownnig" className="max-h-full max-w-full object-contain" />
             </div>
@@ -221,13 +221,13 @@ export function AdminConsole({ page }: { page: AdminPage }) {
 
           <nav className="mt-5 space-y-1">
             {visibleNavItems.map(([id, Icon, label]) => (
-              <button key={id} onClick={() => navigate(id)} className={`flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm font-semibold transition ${view === id ? "bg-[#102532] text-white" : "text-slate-600 hover:bg-slate-100"}`}>
+              <button key={id} onClick={() => navigate(id)} className={`flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm font-semibold transition ${view === id ? "bg-[#0b4ea2] text-white" : "text-slate-600 hover:bg-slate-100"}`}>
                 <Icon className="h-4 w-4" /> {label}
               </button>
             ))}
           </nav>
 
-          <Button className="mt-auto bg-white text-[#102532] ring-1 ring-slate-200 hover:bg-slate-50" onClick={signOut}>
+          <Button className="mt-auto bg-white text-[#0b4ea2] ring-1 ring-slate-200 hover:bg-slate-50" onClick={signOut}>
             <ArrowLeft className="h-4 w-4" /> Sign out
           </Button>
         </div>
@@ -237,20 +237,20 @@ export function AdminConsole({ page }: { page: AdminPage }) {
         <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 px-4 py-4 backdrop-blur sm:px-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-bold uppercase text-[#13a7a5]">{role === "SUPER_ADMIN" ? "All branches" : "Branch workspace"}</p>
+              <p className="text-xs font-bold uppercase text-[#df1f2d]">{role === "SUPER_ADMIN" ? "All branches" : "Branch workspace"}</p>
               <h1 className="text-xl font-bold sm:text-2xl">{role === "SUPER_ADMIN" ? "Corporate Overview" : "Branch Operations"}</h1>
             </div>
             <div className="flex w-full flex-wrap items-center gap-2 lg:w-auto">
               <DateInput value={range.from} onChange={(value) => setRange({ ...range, from: value })} />
               <DateInput value={range.to} onChange={(value) => setRange({ ...range, to: value })} />
-              <Button className="bg-[#102532] px-3 hover:bg-[#1b3544]" onClick={exportCsv}><Download className="h-4 w-4" /> CSV</Button>
-              <Button className="bg-[#102532] px-3 hover:bg-[#1b3544]" onClick={exportPdf}><FileText className="h-4 w-4" /> PDF</Button>
-              <Button className="bg-white px-3 text-[#102532] ring-1 ring-slate-200 hover:bg-slate-50 lg:hidden" onClick={signOut}>Sign out</Button>
+              <Button className="bg-[#0b4ea2] px-3 hover:bg-[#073b78]" onClick={exportCsv}><Download className="h-4 w-4" /> CSV</Button>
+              <Button className="bg-[#0b4ea2] px-3 hover:bg-[#073b78]" onClick={exportPdf}><FileText className="h-4 w-4" /> PDF</Button>
+              <Button className="bg-white px-3 text-[#0b4ea2] ring-1 ring-slate-200 hover:bg-slate-50 lg:hidden" onClick={signOut}>Sign out</Button>
             </div>
           </div>
           <nav className="mt-3 flex gap-2 overflow-x-auto pb-1 lg:hidden">
             {visibleNavItems.map(([id, Icon, label]) => (
-              <button key={id} onClick={() => navigate(id)} className={`flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold ${view === id ? "bg-[#102532] text-white" : "bg-slate-100 text-slate-600"}`}>
+              <button key={id} onClick={() => navigate(id)} className={`flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold ${view === id ? "bg-[#0b4ea2] text-white" : "bg-slate-100 text-slate-600"}`}>
                 <Icon className="h-4 w-4" /> {label}
               </button>
             ))}
@@ -333,12 +333,12 @@ function Dashboard({ cards, analytics, orders }: { cards: Array<{ label: string;
         <Card className="border-0 p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
             <div><h3 className="font-bold">Revenue by branch</h3><p className="text-sm text-slate-500">Paid cleaning and delivery totals</p></div>
-            <BarChart3 className="h-5 w-5 text-[#13a7a5]" />
+            <BarChart3 className="h-5 w-5 text-[#df1f2d]" />
           </div>
           {analytics?.byBranch.length ? (
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={analytics.byBranch}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="branch" /><YAxis /><Tooltip formatter={(value) => formatNaira(Number(value))} /><Bar dataKey="revenue" fill="#13a7a5" radius={[8, 8, 0, 0]} /></BarChart>
+                <BarChart data={analytics.byBranch}><CartesianGrid strokeDasharray="3 3" vertical={false} /><XAxis dataKey="branch" /><YAxis /><Tooltip formatter={(value) => formatNaira(Number(value))} /><Bar dataKey="revenue" fill="#df1f2d" radius={[8, 8, 0, 0]} /></BarChart>
               </ResponsiveContainer>
             </div>
           ) : <EmptyState title="No paid revenue yet" detail="Revenue appears after bills are paid." />}
@@ -374,7 +374,7 @@ function OrdersPipeline({ orders, token, onOrderUpdated, onStartPricing }: { ord
           <Card key={column.title} className="min-h-[360px] border-0 bg-white p-4 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
               <h3 className="font-bold">{column.title}</h3>
-              <span className="rounded-full bg-cyan-50 px-2 py-1 text-xs font-bold text-cyan-700">{columnOrders.length}</span>
+              <span className="rounded-full bg-red-50 px-2 py-1 text-xs font-bold text-red-700">{columnOrders.length}</span>
             </div>
             <div className="space-y-3">
               {columnOrders.map((order) => <OrderCard key={order.id} order={order} token={token} onOrderUpdated={onOrderUpdated} onStartPricing={onStartPricing} />)}
@@ -436,7 +436,7 @@ function OrderCard({ order, token, onOrderUpdated, onStartPricing }: { order: Or
 
   return (
     <div
-      className={`rounded-lg border border-slate-200 bg-slate-50 p-4 ${opensBillWorkspace ? "cursor-pointer transition hover:border-[#13a7a5] hover:bg-cyan-50" : ""}`}
+      className={`rounded-lg border border-slate-200 bg-slate-50 p-4 ${opensBillWorkspace ? "cursor-pointer transition hover:border-[#df1f2d] hover:bg-red-50" : ""}`}
       role={opensBillWorkspace ? "button" : undefined}
       tabIndex={opensBillWorkspace ? 0 : undefined}
       onClick={() => {
@@ -459,7 +459,7 @@ function OrderCard({ order, token, onOrderUpdated, onStartPricing }: { order: Or
               </div>
               <p className="mt-1 text-slate-500">{formatNaira(delivery.fee)}</p>
               {delivery.trackingUrl && (
-                <a className="mt-2 inline-flex items-center gap-1 font-bold text-[#0b817f]" href={delivery.trackingUrl} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>
+                <a className="mt-2 inline-flex items-center gap-1 font-bold text-[#b91c1c]" href={delivery.trackingUrl} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>
                   Track delivery <ExternalLink className="h-3 w-3" />
                 </a>
               )}
@@ -482,7 +482,7 @@ function OrderCard({ order, token, onOrderUpdated, onStartPricing }: { order: Or
       )}
       <div className="mt-3 flex flex-wrap gap-2">
         {canMarkAtBranchForTesting && (
-          <Button className="h-9 bg-white px-3 text-xs text-[#102532] ring-1 ring-slate-200 hover:bg-slate-50" disabled={isUpdating} onClick={(event) => {
+          <Button className="h-9 bg-white px-3 text-xs text-[#0b4ea2] ring-1 ring-slate-200 hover:bg-slate-50" disabled={isUpdating} onClick={(event) => {
             event.stopPropagation();
             updateStatus("AT_BRANCH", "Test pickup marked as received at branch");
           }}>
@@ -490,7 +490,7 @@ function OrderCard({ order, token, onOrderUpdated, onStartPricing }: { order: Or
           </Button>
         )}
         {order.status === "AT_BRANCH" && (
-          <Button className="h-9 bg-white px-3 text-xs text-[#102532] ring-1 ring-slate-200 hover:bg-slate-50" disabled={isUpdating} onClick={(event) => {
+          <Button className="h-9 bg-white px-3 text-xs text-[#0b4ea2] ring-1 ring-slate-200 hover:bg-slate-50" disabled={isUpdating} onClick={(event) => {
             event.stopPropagation();
             updateStatus("PRICING", "Branch started inspection and pricing");
           }}>
@@ -498,7 +498,7 @@ function OrderCard({ order, token, onOrderUpdated, onStartPricing }: { order: Or
           </Button>
         )}
         {order.status === "PRICING" && (
-          <Button className="h-9 bg-white px-3 text-xs text-[#102532] ring-1 ring-slate-200 hover:bg-slate-50" onClick={(event) => {
+          <Button className="h-9 bg-white px-3 text-xs text-[#0b4ea2] ring-1 ring-slate-200 hover:bg-slate-50" onClick={(event) => {
             event.stopPropagation();
             onStartPricing(order);
           }}>
@@ -506,7 +506,7 @@ function OrderCard({ order, token, onOrderUpdated, onStartPricing }: { order: Or
           </Button>
         )}
         {canMarkReady && (
-          <Button className="h-9 bg-white px-3 text-xs text-[#102532] ring-1 ring-slate-200 hover:bg-slate-50" disabled={isUpdating} onClick={(event) => {
+          <Button className="h-9 bg-white px-3 text-xs text-[#0b4ea2] ring-1 ring-slate-200 hover:bg-slate-50" disabled={isUpdating} onClick={(event) => {
             event.stopPropagation();
             updateStatus("READY", "Branch marked cleaning complete and order ready");
           }}>
@@ -514,7 +514,7 @@ function OrderCard({ order, token, onOrderUpdated, onStartPricing }: { order: Or
           </Button>
         )}
         {opensBillWorkspace && (
-          <span className="text-xs font-semibold text-[#13a7a5]">Click to view bill</span>
+          <span className="text-xs font-semibold text-[#df1f2d]">Click to view bill</span>
         )}
       </div>
     </div>
@@ -629,19 +629,19 @@ function PricingWorkspace({ order, token, onOrderUpdated, onBack }: { order: Ord
     <div className="space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <button className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-[#102532]" onClick={onBack}>
+          <button className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-[#0b4ea2]" onClick={onBack}>
             <ArrowLeft className="h-4 w-4" /> Back to orders
           </button>
-          <p className="text-xs font-bold uppercase text-[#13a7a5]">Inspection pricing</p>
+          <p className="text-xs font-bold uppercase text-[#df1f2d]">Inspection pricing</p>
           <h2 className="mt-1 text-2xl font-bold">{order.code}</h2>
           <p className="mt-1 text-sm text-slate-500">{order.customer?.fullName ?? "Customer"} · {order.branch?.name ?? "Branch"} · {formatStatus(order.status)}</p>
         </div>
         {order.bill?.paystackUrl && (
           <div className="flex flex-wrap gap-2">
-            <Button className="h-11 bg-white px-3 text-[#102532] ring-1 ring-slate-200 hover:bg-slate-50" disabled={isResending || Boolean(order.bill.paidAt)} onClick={resendPaymentLink}>
+            <Button className="h-11 bg-white px-3 text-[#0b4ea2] ring-1 ring-slate-200 hover:bg-slate-50" disabled={isResending || Boolean(order.bill.paidAt)} onClick={resendPaymentLink}>
               <Mail className="h-4 w-4" /> Resend link
             </Button>
-            <a className="inline-flex h-11 items-center justify-center rounded-lg bg-[#102532] px-4 text-sm font-semibold text-white" href={order.bill.paystackUrl} target="_blank" rel="noreferrer">Open payment link</a>
+            <a className="inline-flex h-11 items-center justify-center rounded-lg bg-[#0b4ea2] px-4 text-sm font-semibold text-white" href={order.bill.paystackUrl} target="_blank" rel="noreferrer">Open payment link</a>
           </div>
         )}
       </div>
@@ -690,10 +690,10 @@ function PricingWorkspace({ order, token, onOrderUpdated, onBack }: { order: Ord
               <p className="font-bold">Bill total: {formatNaira(order.bill.total)}</p>
               <p className="mt-1 text-slate-500">Cleaning {formatNaira(order.bill.cleaningSubtotal)} · Delivery {formatNaira(order.bill.deliveryFee)}</p>
               <div className="mt-3 flex flex-wrap gap-2">
-                <Button className="h-10 bg-white px-3 text-[#102532] ring-1 ring-slate-200 hover:bg-slate-50" disabled={isResending || Boolean(order.bill.paidAt)} onClick={resendPaymentLink}>
+                <Button className="h-10 bg-white px-3 text-[#0b4ea2] ring-1 ring-slate-200 hover:bg-slate-50" disabled={isResending || Boolean(order.bill.paidAt)} onClick={resendPaymentLink}>
                   <Mail className="h-4 w-4" /> Resend Paystack link
                 </Button>
-                {order.bill.paystackUrl && <a className="inline-flex h-10 items-center justify-center rounded-lg bg-[#102532] px-3 text-sm font-semibold text-white" href={order.bill.paystackUrl} target="_blank" rel="noreferrer">Open link</a>}
+                {order.bill.paystackUrl && <a className="inline-flex h-10 items-center justify-center rounded-lg bg-[#0b4ea2] px-3 text-sm font-semibold text-white" href={order.bill.paystackUrl} target="_blank" rel="noreferrer">Open link</a>}
               </div>
               <div className="mt-4 space-y-2">
                 {order.bill.items?.map((item) => (
@@ -722,7 +722,7 @@ function PricingWorkspace({ order, token, onOrderUpdated, onBack }: { order: Ord
               ))}
               <div className="grid gap-3 sm:grid-cols-[1fr_auto_auto] sm:items-end">
                 <Input placeholder="Delivery fee" value={deliveryFee} onChange={setDeliveryFee} type="number" />
-                <Button className="h-12 bg-white px-3 text-[#102532] ring-1 ring-slate-200 hover:bg-slate-50" onClick={addPricingItem}>
+                <Button className="h-12 bg-white px-3 text-[#0b4ea2] ring-1 ring-slate-200 hover:bg-slate-50" onClick={addPricingItem}>
                   <Plus className="h-4 w-4" /> Item
                 </Button>
                 <Button className="h-12 px-3" disabled={isSaving} onClick={saveBill}>
@@ -845,7 +845,7 @@ function BranchManagement({ branches, branchUsers, token, role, assignedBranchId
     <div className="space-y-5">
       <div className="grid gap-5 xl:grid-cols-[1fr_1fr]">
         {canCreateBranches && <Card className="border-0 p-5 shadow-sm">
-          <h3 className="flex items-center gap-2 text-xl font-bold"><Plus className="h-5 w-5 text-[#13a7a5]" />Create branch</h3>
+          <h3 className="flex items-center gap-2 text-xl font-bold"><Plus className="h-5 w-5 text-[#df1f2d]" />Create branch</h3>
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
             <Input placeholder="Branch name" value={branchForm.name} onChange={(name) => setBranchForm({ ...branchForm, name })} />
             <Input placeholder="Slug" value={branchForm.slug} onChange={(slug) => setBranchForm({ ...branchForm, slug })} />
@@ -862,15 +862,15 @@ function BranchManagement({ branches, branchUsers, token, role, assignedBranchId
               setGeocodeResults([]);
             }} />
             <Input placeholder="Phone" value={branchForm.phone} onChange={(phone) => setBranchForm({ ...branchForm, phone })} />
-            <Button className="h-12 bg-white text-[#102532] ring-1 ring-slate-200 hover:bg-slate-50 sm:col-span-2" disabled={isGeocoding} onClick={findCoordinates}>
+            <Button className="h-12 bg-white text-[#0b4ea2] ring-1 ring-slate-200 hover:bg-slate-50 sm:col-span-2" disabled={isGeocoding} onClick={findCoordinates}>
               <MapPin className="h-4 w-4" /> {isGeocoding ? "Finding coordinates..." : "Find coordinates from address"}
             </Button>
             {geocodeResults.length > 0 && (
-              <div className="space-y-3 rounded-lg border border-cyan-200 bg-cyan-50 p-3 text-sm text-cyan-950 sm:col-span-2">
+              <div className="space-y-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-950 sm:col-span-2">
                 <p className="font-bold">Choose the best matching location</p>
                 {geocodeResults.map((result) => (
                   <div key={`${result.latitude}-${result.longitude}`} className="rounded-lg bg-white p-3">
-                    <p className="text-cyan-950">{result.label}</p>
+                    <p className="text-red-950">{result.label}</p>
                     <div className="mt-3 grid gap-2 sm:grid-cols-2">
                       <ReadOnlyValue label="Latitude" value={result.latitude} />
                       <ReadOnlyValue label="Longitude" value={result.longitude} />
@@ -886,7 +886,7 @@ function BranchManagement({ branches, branchUsers, token, role, assignedBranchId
           </div>
         </Card>}
         <Card className="border-0 p-5 shadow-sm">
-          <h3 className="flex items-center gap-2 text-xl font-bold"><UserPlus className="h-5 w-5 text-[#13a7a5]" />{canCreateBranches ? "Create branch user" : "Create branch staff"}</h3>
+          <h3 className="flex items-center gap-2 text-xl font-bold"><UserPlus className="h-5 w-5 text-[#df1f2d]" />{canCreateBranches ? "Create branch user" : "Create branch staff"}</h3>
           <p className="mt-2 text-sm text-slate-500">Use an email that is not already registered as a customer or admin.</p>
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
             <Input placeholder="Full name" value={adminForm.fullName} onChange={(fullName) => setAdminForm({ ...adminForm, fullName })} />
@@ -929,13 +929,13 @@ function BranchDirectory({ branches, branchUsers, visibleBranches, selectedBranc
       <Card className="border-0 p-5 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h3 className="flex items-center gap-2 text-xl font-bold"><Building2 className="h-5 w-5 text-[#13a7a5]" />Branches</h3>
+            <h3 className="flex items-center gap-2 text-xl font-bold"><Building2 className="h-5 w-5 text-[#df1f2d]" />Branches</h3>
             <p className="mt-1 text-sm text-slate-500">{branches.length} active {branches.length === 1 ? "branch" : "branches"}</p>
           </div>
           <div className="flex items-center gap-2 text-sm font-semibold text-slate-500">
-            <Button className="h-9 bg-white px-3 text-[#102532] ring-1 ring-slate-200 hover:bg-slate-50" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>Previous</Button>
+            <Button className="h-9 bg-white px-3 text-[#0b4ea2] ring-1 ring-slate-200 hover:bg-slate-50" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>Previous</Button>
             <span>Page {page} of {pageCount}</span>
-            <Button className="h-9 bg-white px-3 text-[#102532] ring-1 ring-slate-200 hover:bg-slate-50" disabled={page >= pageCount} onClick={() => onPageChange(page + 1)}>Next</Button>
+            <Button className="h-9 bg-white px-3 text-[#0b4ea2] ring-1 ring-slate-200 hover:bg-slate-50" disabled={page >= pageCount} onClick={() => onPageChange(page + 1)}>Next</Button>
           </div>
         </div>
         <div className="mt-5 grid gap-3 md:grid-cols-2">
@@ -943,10 +943,10 @@ function BranchDirectory({ branches, branchUsers, visibleBranches, selectedBranc
             const usersForBranch = branchUsers.filter((user) => user.branchId === branch.id);
             const isSelected = branch.id === selectedBranchId;
             return (
-              <button key={branch.id} className={`rounded-lg border p-4 text-left transition ${isSelected ? "border-[#13a7a5] bg-cyan-50" : "border-slate-200 bg-white hover:border-slate-300"}`} onClick={() => onSelectBranch(branch.id)}>
+              <button key={branch.id} className={`rounded-lg border p-4 text-left transition ${isSelected ? "border-[#df1f2d] bg-red-50" : "border-slate-200 bg-white hover:border-slate-300"}`} onClick={() => onSelectBranch(branch.id)}>
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="font-bold text-[#102532]">{branch.name}</p>
+                    <p className="font-bold text-[#0b4ea2]">{branch.name}</p>
                     <p className="mt-1 text-sm text-slate-500">{branch.address}, {branch.city}, {branch.state}</p>
                   </div>
                   <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-bold text-slate-600">{branch.isActive ? "Active" : "Inactive"}</span>
@@ -964,7 +964,7 @@ function BranchDirectory({ branches, branchUsers, visibleBranches, selectedBranc
       </Card>
 
       <Card className="border-0 p-5 shadow-sm">
-        <h3 className="flex items-center gap-2 text-xl font-bold"><Users className="h-5 w-5 text-[#13a7a5]" />Branch users</h3>
+        <h3 className="flex items-center gap-2 text-xl font-bold"><Users className="h-5 w-5 text-[#df1f2d]" />Branch users</h3>
         {selectedBranch ? (
           <>
             <p className="mt-2 text-sm text-slate-500">{selectedBranch.name}</p>
@@ -977,7 +977,7 @@ function BranchDirectory({ branches, branchUsers, visibleBranches, selectedBranc
                       <p className="mt-1 break-all text-sm text-slate-500">{user.email}</p>
                       {user.phone && <p className="mt-1 text-sm text-slate-500">{user.phone}</p>}
                     </div>
-                    <span className="shrink-0 rounded-full bg-cyan-50 px-2 py-1 text-xs font-bold text-cyan-700">{user.role === "BRANCH_ADMIN" ? "Admin" : "Staff"}</span>
+                    <span className="shrink-0 rounded-full bg-red-50 px-2 py-1 text-xs font-bold text-red-700">{user.role === "BRANCH_ADMIN" ? "Admin" : "Staff"}</span>
                   </div>
                 </div>
               ))}
@@ -1041,7 +1041,7 @@ function NotificationsComposer({ customers, token }: { customers: ApiUser[]; tok
           <Field label="Title" value={title} onChange={setTitle} />
           <Field label="Short preview" value={excerpt} onChange={setExcerpt} />
         </div>
-        <textarea className="mt-4 min-h-48 w-full rounded-lg border border-slate-200 bg-white p-4 text-sm outline-none focus:border-[#13a7a5]" placeholder="Message body" value={body} onChange={(event) => setBody(event.target.value)} />
+        <textarea className="mt-4 min-h-48 w-full rounded-lg border border-slate-200 bg-white p-4 text-sm outline-none focus:border-[#df1f2d]" placeholder="Message body" value={body} onChange={(event) => setBody(event.target.value)} />
         <div className="mt-5 grid gap-3 sm:grid-cols-3">
           <Channel checked={channels.inApp} label="In-app" icon={<Bell />} onClick={() => setChannels({ ...channels, inApp: !channels.inApp })} />
           <Channel checked={channels.email} label="Email" icon={<Mail />} onClick={() => setChannels({ ...channels, email: !channels.email })} />
@@ -1050,7 +1050,7 @@ function NotificationsComposer({ customers, token }: { customers: ApiUser[]; tok
         <p className="mt-3 text-xs font-semibold text-slate-500">Push delivery needs a device-token provider such as FCM/APNs before it can be enabled.</p>
       </Card>
       <Card className="border-0 p-5 shadow-sm">
-        <p className="text-sm font-bold uppercase text-[#13a7a5]">Audience</p>
+        <p className="text-sm font-bold uppercase text-[#df1f2d]">Audience</p>
         <div className="mt-4 space-y-2">
           {customers.map((customer) => (
             <label key={customer.id} className="flex items-center gap-3 rounded-lg border border-slate-200 p-3 text-sm">
@@ -1086,7 +1086,7 @@ function Logistics({ orders }: { orders: Order[] }) {
                   <p className="mt-1 text-slate-500">{delivery.status} · {formatNaira(delivery.fee)}</p>
                   {delivery.externalDeliveryId && <p className="mt-1 text-xs text-slate-500">Ref: {delivery.externalDeliveryId}</p>}
                   {delivery.trackingUrl && (
-                    <a className="mt-2 inline-flex items-center gap-1 text-sm font-bold text-[#0b817f]" href={delivery.trackingUrl} target="_blank" rel="noreferrer">
+                    <a className="mt-2 inline-flex items-center gap-1 text-sm font-bold text-[#b91c1c]" href={delivery.trackingUrl} target="_blank" rel="noreferrer">
                       Open tracking <ExternalLink className="h-3.5 w-3.5" />
                     </a>
                   )}
@@ -1154,7 +1154,7 @@ function AuditLogs({ token, branches, role }: { token: string; branches: Branch[
         </div>
       </div>
       <div className="mt-5 grid gap-3 lg:grid-cols-4">
-        <input className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-[#13a7a5]" placeholder="Search logs" value={search} onChange={(event) => updateFilter(setSearch, event.target.value)} />
+        <input className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-[#df1f2d]" placeholder="Search logs" value={search} onChange={(event) => updateFilter(setSearch, event.target.value)} />
         {role === "SUPER_ADMIN" && (
           <select className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm" value={branchFilter} onChange={(event) => updateFilter(setBranchFilter, event.target.value)}>
             <option value="">All branches</option>
@@ -1205,8 +1205,8 @@ function AuditLogs({ token, branches, role }: { token: string; branches: Branch[
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3 text-sm font-semibold text-slate-500">
         <span>Page {page} of {totalPages}</span>
         <div className="flex gap-2">
-          <Button className="h-9 bg-white px-3 text-[#102532] ring-1 ring-slate-200 hover:bg-slate-50" disabled={page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))}>Previous</Button>
-          <Button className="h-9 bg-white px-3 text-[#102532] ring-1 ring-slate-200 hover:bg-slate-50" disabled={page >= totalPages} onClick={() => setPage((current) => Math.min(totalPages, current + 1))}>Next</Button>
+          <Button className="h-9 bg-white px-3 text-[#0b4ea2] ring-1 ring-slate-200 hover:bg-slate-50" disabled={page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))}>Previous</Button>
+          <Button className="h-9 bg-white px-3 text-[#0b4ea2] ring-1 ring-slate-200 hover:bg-slate-50" disabled={page >= totalPages} onClick={() => setPage((current) => Math.min(totalPages, current + 1))}>Next</Button>
         </div>
       </div>
     </Card>
@@ -1218,7 +1218,7 @@ function SettingsPanel({ role }: { role: string }) {
 }
 
 function Field({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
-  return <label className="text-sm font-semibold text-slate-700">{label}<input className="mt-2 h-12 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-[#13a7a5]" value={value} onChange={(event) => onChange(event.target.value)} /></label>;
+  return <label className="text-sm font-semibold text-slate-700">{label}<input className="mt-2 h-12 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-[#df1f2d]" value={value} onChange={(event) => onChange(event.target.value)} /></label>;
 }
 
 function Input({ placeholder, value, onChange, type = "text" }: { placeholder: string; value: string; onChange: (value: string) => void; type?: string }) {
@@ -1226,7 +1226,7 @@ function Input({ placeholder, value, onChange, type = "text" }: { placeholder: s
   const isPassword = type === "password";
   return (
     <span className="relative block">
-      <input className="h-12 w-full rounded-lg border border-slate-200 px-3 pr-11 text-sm outline-none focus:border-[#13a7a5]" placeholder={placeholder} type={isPassword && showPassword ? "text" : type} value={value} onChange={(event) => onChange(event.target.value)} />
+      <input className="h-12 w-full rounded-lg border border-slate-200 px-3 pr-11 text-sm outline-none focus:border-[#df1f2d]" placeholder={placeholder} type={isPassword && showPassword ? "text" : type} value={value} onChange={(event) => onChange(event.target.value)} />
       {isPassword && (
         <button type="button" aria-label={showPassword ? "Hide password" : "Show password"} className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-slate-500 hover:bg-slate-100" onClick={() => setShowPassword((current) => !current)}>
           {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -1246,7 +1246,7 @@ function ReadOnlyValue({ label, value }: { label: string; value: string }) {
 }
 
 function Channel({ checked, label, icon, disabled, onClick }: { checked: boolean; label: string; icon: React.ReactNode; disabled?: boolean; onClick: () => void }) {
-  return <button disabled={disabled} onClick={onClick} className={`flex items-center gap-3 rounded-lg border p-3 text-left text-sm font-semibold ${disabled ? "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400" : checked ? "border-[#13a7a5] bg-cyan-50 text-[#102532]" : "border-slate-200 bg-white text-slate-500"}`}><span className={disabled ? "text-slate-400" : "text-[#13a7a5]"}>{icon}</span>{label}</button>;
+  return <button disabled={disabled} onClick={onClick} className={`flex items-center gap-3 rounded-lg border p-3 text-left text-sm font-semibold ${disabled ? "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400" : checked ? "border-[#df1f2d] bg-red-50 text-[#0b4ea2]" : "border-slate-200 bg-white text-slate-500"}`}><span className={disabled ? "text-slate-400" : "text-[#df1f2d]"}>{icon}</span>{label}</button>;
 }
 
 function EmptyState({ title, detail }: { title: string; detail: string }) {
