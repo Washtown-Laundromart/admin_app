@@ -1,4 +1,4 @@
-// Admin should call only the FreshFold backend; courier and payment secrets stay in backend `.env`.
+// Admin should call only the Washtownnig backend; courier and payment secrets stay in backend `.env`.
 export const API_BASE_URL = "/api/freshfold";
 
 export type AdminRole = "SUPER_ADMIN" | "BRANCH_ADMIN" | "BRANCH_STAFF";
@@ -137,13 +137,13 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}, token
           await new Promise((resolve) => window.setTimeout(resolve, 800));
           continue;
         }
-        throw new Error("FreshFold could not reach its server right now. Please try again later.");
+        throw new Error("Washtownnig could not reach its server right now. Please try again later.");
       }
       throw error;
     }
   }
 
-  throw new Error("FreshFold could not reach its server right now. Please try again later.");
+  throw new Error("Washtownnig could not reach its server right now. Please try again later.");
 }
 
 export function toErrorMessage(error: unknown) {
@@ -167,9 +167,9 @@ function friendlyErrorMessage(message?: string) {
     return "No same-day courier is available for this route right now. Try again shortly, choose another provider, or arrange this delivery manually.";
   }
   if (normalized.includes("failed to fetch") || normalized.includes("network") || normalized.includes("can't reach")) {
-    return "We could not connect to FreshFold right now. Please check your internet connection and try again.";
+    return "We could not connect to Washtownnig right now. Please check your internet connection and try again.";
   }
-  if (normalized.includes("could not connect to freshfold at")) return message ?? "We could not connect to FreshFold right now.";
+  if (normalized.includes("could not connect to freshfold at")) return message ?? "We could not connect to Washtownnig right now.";
   if (normalized.includes("unique constraint") || normalized.includes("already exists")) return "An account with this email already exists. Use a different email address.";
   return message && message.length < 140 ? message : "Something went wrong. Please try again.";
 }

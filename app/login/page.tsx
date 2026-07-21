@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowRight, Building2, Check, Eye, EyeOff, ShieldCheck, WashingMachine } from "lucide-react";
+import { ArrowRight, Building2, Check, Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/components/toast-provider";
@@ -39,11 +39,11 @@ export default function AdminLoginPage() {
     <main className="grid min-h-screen bg-[#f6f8f8] text-[#102532] lg:grid-cols-[0.9fr_1.1fr]">
       <section className="flex flex-col justify-between bg-[#102532] p-6 text-white lg:p-10">
         <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-white/10">
-            <WashingMachine className="h-6 w-6" />
+          <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-white p-1.5">
+            <img src="/washtownlogo.png" alt="Washtownnig" className="max-h-full max-w-full object-contain" />
           </div>
           <div>
-            <p className="text-xl font-bold">FreshFold Admin</p>
+            <p className="text-xl font-bold">Washtownnig Admin</p>
             <p className="text-sm text-slate-300">Operations and branch control</p>
           </div>
         </div>

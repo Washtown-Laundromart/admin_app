@@ -22,8 +22,7 @@ import {
   Settings,
   Truck,
   Users,
-  UserPlus,
-  WashingMachine
+  UserPlus
 } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import jsPDF from "jspdf";
@@ -177,7 +176,7 @@ export function AdminConsole({ page }: { page: AdminPage }) {
 
   function exportPdf() {
     const doc = new jsPDF();
-    doc.text("FreshFold Operations Report", 16, 18);
+    doc.text("Washtownnig Operations Report", 16, 18);
     doc.text(`Range: ${range.from} to ${range.to}`, 16, 28);
     cards.forEach((card, index) => doc.text(`${card.label}: ${card.value}`, 16, 42 + index * 10));
     doc.save("freshfold-operations.pdf");
@@ -206,11 +205,11 @@ export function AdminConsole({ page }: { page: AdminPage }) {
       <aside className="fixed left-0 top-0 hidden h-screen w-[280px] border-r border-slate-200 bg-white lg:block">
         <div className="flex h-screen flex-col p-4">
           <div className="flex items-center gap-3 rounded-lg bg-[#102532] p-4 text-white">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10">
-              <WashingMachine className="h-5 w-5" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-white p-1.5">
+              <img src="/washtownlogo.png" alt="Washtownnig" className="max-h-full max-w-full object-contain" />
             </div>
             <div>
-              <p className="font-bold">FreshFold</p>
+              <p className="font-bold">Washtownnig</p>
               <p className="text-xs text-slate-300">Operations console</p>
             </div>
           </div>
