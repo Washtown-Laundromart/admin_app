@@ -29,6 +29,7 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
 import jsPDF from "jspdf";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/toast-provider";
 import { API_BASE_URL, apiFetch, toErrorMessage, type AdminRole, type AnalyticsResponse, type ApiUser, type AuditLog, type AuditLogPage, type Branch, type Order } from "@/lib/api";
 import { useAdminStore } from "@/lib/store";
@@ -258,16 +259,21 @@ export function AdminConsole({ page }: { page: AdminPage }) {
         </header>
 
         <div className="space-y-5 p-4 sm:p-6">
-          {isLoading && <Card className="border-0 p-5 text-sm text-slate-500 shadow-sm">Loading live admin data...</Card>}
-          {view === "dashboard" && <Dashboard cards={cards} analytics={analytics} orders={orders} />}
-          {view === "orders" && <OrdersPipeline orders={orders} token={token} onOrderUpdated={mergeOrder} onStartPricing={openPricing} />}
-          {view === "pricing" && pricingOrder && <PricingWorkspace order={pricingOrder} token={token} onBack={() => navigate("orders")} onOrderUpdated={mergeOrder} />}
-          {view === "billing" && <BillingOps orders={orders} onStartPricing={openPricing} />}
-          {view === "branches" && (role === "SUPER_ADMIN" || role === "BRANCH_ADMIN") && <BranchManagement branches={branches} branchUsers={branchUsers} token={token} role={role} assignedBranchId={branchId} onCreated={(branch) => setBranches((current) => [...current, branch])} onAdminCreated={(user) => setBranchUsers((current) => [user, ...current])} />}
-          {view === "notifications" && <NotificationsComposer customers={customers} token={token} />}
-          {view === "logistics" && <Logistics orders={orders} />}
-          {view === "audit" && <AuditLogs token={token} branches={branches} role={role} />}
-          {view === "settings" && <SettingsPanel role={role} />}
+          {isLoading ? (
+            <AdminPageSkeleton />
+          ) : (
+            <>
+              {view === "dashboard" && <Dashboard cards={cards} analytics={analytics} orders={orders} />}
+              {view === "orders" && <OrdersPipeline orders={orders} token={token} onOrderUpdated={mergeOrder} onStartPricing={openPricing} />}
+              {view === "pricing" && pricingOrder && <PricingWorkspace order={pricingOrder} token={token} onBack={() => navigate("orders")} onOrderUpdated={mergeOrder} />}
+              {view === "billing" && <BillingOps orders={orders} onStartPricing={openPricing} />}
+              {view === "branches" && (role === "SUPER_ADMIN" || role === "BRANCH_ADMIN") && <BranchManagement branches={branches} branchUsers={branchUsers} token={token} role={role} assignedBranchId={branchId} onCreated={(branch) => setBranches((current) => [...current, branch])} onAdminCreated={(user) => setBranchUsers((current) => [user, ...current])} />}
+              {view === "notifications" && <NotificationsComposer customers={customers} token={token} />}
+              {view === "logistics" && <Logistics orders={orders} />}
+              {view === "audit" && <AuditLogs token={token} branches={branches} role={role} />}
+              {view === "settings" && <SettingsPanel role={role} />}
+            </>
+          )}
         </div>
       </section>
     </main>
@@ -280,6 +286,41 @@ function DateInput({ value, onChange }: { value: string; onChange: (value: strin
       <Calendar className="h-4 w-4 text-slate-400" />
       <input className="min-w-0 bg-transparent outline-none" type="date" value={value} onChange={(event) => onChange(event.target.value)} />
     </label>
+  );
+}
+
+function AdminPageSkeleton() {
+  return (
+    <div className="space-y-5">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <Card key={index} className="border-0 p-5 shadow-sm">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="mt-4 h-8 w-32" />
+            <Skeleton className="mt-3 h-3 w-40" />
+          </Card>
+        ))}
+      </div>
+      <div className="grid gap-4 xl:grid-cols-5">
+        {Array.from({ length: 5 }).map((_, index) => (
+          <Card key={index} className="border-0 p-4 shadow-sm">
+            <div className="mb-4 flex items-center justify-between">
+              <Skeleton className="h-5 w-24" />
+              <Skeleton className="h-6 w-8 rounded-full" />
+            </div>
+            <div className="space-y-3">
+              {Array.from({ length: 3 }).map((__, itemIndex) => (
+                <div key={itemIndex} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="mt-3 h-3 w-36" />
+                  <Skeleton className="mt-4 h-8 w-28" />
+                </div>
+              ))}
+            </div>
+          </Card>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -1072,6 +1113,7 @@ function AuditLogs({ token, branches, role }: { token: string; branches: Branch[
   const [roleFilter, setRoleFilter] = useState("");
   const [actionFilter, setActionFilter] = useState("");
   const [branchFilter, setBranchFilter] = useState("");
+  const [isLoading, setIsLoading] = useState(true);
   const branchName = (id?: string | null) => branches.find((branch) => branch.id === id)?.name ?? "Corporate";
 
   useEffect(() => {
@@ -1084,6 +1126,7 @@ function AuditLogs({ token, branches, role }: { token: string; branches: Branch[
       if (branchFilter) params.set("branchId", branchFilter);
       if (roleFilter) params.set("actorRole", roleFilter);
       if (actionFilter) params.set("action", actionFilter);
+      setIsLoading(true);
       apiFetch<AuditLogPage>(`/api/admin/audit-logs?${params.toString()}`, {}, token).then((result) => {
         setLogs(result.data);
         setActions(result.actions);
@@ -1091,6 +1134,8 @@ function AuditLogs({ token, branches, role }: { token: string; branches: Branch[
         setTotalPages(result.totalPages);
       }).catch((error) => {
         showToast({ type: "error", title: "Could not load audit logs", message: toErrorMessage(error) });
+      }).finally(() => {
+        setIsLoading(false);
       });
     }, 250);
     return () => window.clearTimeout(timeout);
@@ -1129,7 +1174,18 @@ function AuditLogs({ token, branches, role }: { token: string; branches: Branch[
         </select>
       </div>
       <div className="mt-5 space-y-3">
-        {logs.map((log) => (
+        {isLoading && Array.from({ length: 5 }).map((_, index) => (
+          <div key={index} className="rounded-lg border border-slate-200 bg-white p-4">
+            <Skeleton className="h-5 w-3/4" />
+            <Skeleton className="mt-3 h-4 w-1/3" />
+            <div className="mt-4 grid gap-2 sm:grid-cols-3">
+              <Skeleton className="h-14" />
+              <Skeleton className="h-14" />
+              <Skeleton className="h-14" />
+            </div>
+          </div>
+        ))}
+        {!isLoading && logs.map((log) => (
           <div key={log.id} className="rounded-lg border border-slate-200 bg-white p-4">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
@@ -1145,7 +1201,7 @@ function AuditLogs({ token, branches, role }: { token: string; branches: Branch[
             </div>
           </div>
         ))}
-        {!logs.length && <EmptyState title="No audit logs found" detail="Try a different search or filter." />}
+        {!isLoading && !logs.length && <EmptyState title="No audit logs found" detail="Try a different search or filter." />}
       </div>
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3 text-sm font-semibold text-slate-500">
         <span>Page {page} of {totalPages}</span>
