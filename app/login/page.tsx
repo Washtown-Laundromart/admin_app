@@ -37,8 +37,12 @@ export default function AdminLoginPage() {
 
   return (
     <main className="grid min-h-screen bg-[#f4f7fb] text-slate-950 lg:grid-cols-[0.9fr_1.1fr]">
-      <section className="flex flex-col justify-between bg-[#0b4ea2] p-6 text-white lg:p-10">
-        <div className="flex items-center gap-3">
+      <section className="relative hidden min-h-screen overflow-hidden text-white lg:flex lg:flex-col lg:justify-between lg:p-10">
+        <video className="absolute inset-0 h-full w-full object-cover" autoPlay muted loop playsInline preload="metadata" aria-hidden="true">
+          <source src="/auth-background.mp4" type="video/mp4" />
+        </video>
+        <div className="absolute inset-0 bg-slate-950/55" />
+        <div className="relative flex items-center gap-3">
           <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-white p-1.5">
             <img src="/washtownlogo.png" alt="Washtownnig" className="max-h-full max-w-full object-contain" />
           </div>
@@ -47,7 +51,7 @@ export default function AdminLoginPage() {
             <p className="text-sm text-slate-300">Operations and branch control</p>
           </div>
         </div>
-        <div className="my-10 max-w-xl lg:my-16">
+        <div className="relative my-10 max-w-xl lg:my-16">
           <p className="text-sm font-bold uppercase text-red-100">Admin access</p>
           <h1 className="mt-4 text-3xl font-bold leading-tight sm:text-4xl lg:text-5xl">Control orders, branches, couriers and revenue from one console.</h1>
           <div className="mt-8 grid gap-3 text-sm text-slate-200">
@@ -56,7 +60,7 @@ export default function AdminLoginPage() {
             ))}
           </div>
         </div>
-        <div className="flex items-center gap-2 text-sm text-slate-300">
+        <div className="relative flex items-center gap-2 text-sm text-slate-300">
           <ShieldCheck className="h-4 w-4 text-red-200" />
           Role-scoped console
         </div>
@@ -64,7 +68,16 @@ export default function AdminLoginPage() {
 
       <section className="flex items-center justify-center p-5">
         <Card className="w-full max-w-xl border-0 p-4 shadow-xl shadow-slate-200 sm:p-6">
-          <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-lg bg-red-50 text-[#df1f2d]">
+          <div className="mb-6 flex items-center gap-3 lg:hidden">
+            <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-white p-1 ring-1 ring-slate-200">
+              <img src="/washtownlogo.png" alt="Washtownnig" className="max-h-full max-w-full object-contain" />
+            </div>
+            <div>
+              <p className="text-lg font-bold text-[#0b4ea2]">Washtownnig Admin</p>
+              <p className="text-xs text-slate-500">Operations and branch control</p>
+            </div>
+          </div>
+          <div className="mb-6 hidden h-12 w-12 items-center justify-center rounded-lg bg-red-50 text-[#df1f2d] lg:flex">
             <Building2 className="h-6 w-6" />
           </div>
           <h2 className="text-2xl font-bold">Sign in to admin</h2>

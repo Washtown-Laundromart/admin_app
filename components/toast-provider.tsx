@@ -48,12 +48,12 @@ export function useToast() {
 function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
   const Icon = toast.type === "success" ? CheckCircle2 : toast.type === "error" ? AlertCircle : Info;
   const styles = {
-    success: "border-blue-200 bg-blue-50 text-blue-950",
+    success: "border-emerald-200 bg-emerald-50 text-emerald-950",
     error: "border-rose-200 bg-rose-50 text-rose-950",
     info: "border-red-200 bg-red-50 text-red-950"
   }[toast.type];
   const iconStyles = {
-    success: "text-blue-700",
+    success: "text-emerald-600",
     error: "text-rose-600",
     info: "text-red-700"
   }[toast.type];
