@@ -201,7 +201,7 @@ export function AdminConsole({ page }: { page: AdminPage }) {
   if (!token) return null;
 
   return (
-    <main className="min-h-screen bg-[#f4f7fb] text-[#0b4ea2]">
+    <main className="min-h-screen bg-[#f4f7fb] text-slate-950">
       <aside className="fixed left-0 top-0 hidden h-screen w-[280px] border-r border-slate-200 bg-white lg:block">
         <div className="flex h-screen flex-col p-4">
           <div className="flex items-center gap-3 rounded-lg bg-[#0b4ea2] p-4 text-white">
@@ -946,7 +946,7 @@ function BranchDirectory({ branches, branchUsers, visibleBranches, selectedBranc
               <button key={branch.id} className={`rounded-lg border p-4 text-left transition ${isSelected ? "border-[#df1f2d] bg-red-50" : "border-slate-200 bg-white hover:border-slate-300"}`} onClick={() => onSelectBranch(branch.id)}>
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="font-bold text-[#0b4ea2]">{branch.name}</p>
+                    <p className="font-bold text-slate-950">{branch.name}</p>
                     <p className="mt-1 text-sm text-slate-500">{branch.address}, {branch.city}, {branch.state}</p>
                   </div>
                   <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-bold text-slate-600">{branch.isActive ? "Active" : "Inactive"}</span>
