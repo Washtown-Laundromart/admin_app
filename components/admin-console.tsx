@@ -462,6 +462,17 @@ function OrderCard({ order, token, onOrderUpdated, onStartPricing }: { order: Or
                 <span className="text-slate-500">{delivery.status}</span>
               </div>
               <p className="mt-1 text-slate-500">{formatNaira(delivery.fee)}</p>
+              <div className="mt-2 rounded-md bg-slate-50 p-2 text-slate-600">
+                <p className="font-bold text-slate-900">Rider details</p>
+                {delivery.courierName || delivery.courierPhone ? (
+                  <>
+                    {delivery.courierName && <p className="mt-1">{delivery.courierName}</p>}
+                    {delivery.courierPhone && <a className="mt-1 block font-bold text-[#0b4ea2]" href={`tel:${delivery.courierPhone}`} onClick={(event) => event.stopPropagation()}>{delivery.courierPhone}</a>}
+                  </>
+                ) : (
+                  <p className="mt-1">Rider details pending</p>
+                )}
+              </div>
               {delivery.trackingUrl && (
                 <a className="mt-2 inline-flex items-center gap-1 font-bold text-[#b91c1c]" href={delivery.trackingUrl} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>
                   Track delivery <ExternalLink className="h-3 w-3" />
@@ -1094,6 +1105,17 @@ function Logistics({ orders }: { orders: Order[] }) {
                   </div>
                   <p className="mt-1 text-slate-500">{delivery.status} · {formatNaira(delivery.fee)}</p>
                   {delivery.externalDeliveryId && <p className="mt-1 text-xs text-slate-500">Ref: {delivery.externalDeliveryId}</p>}
+                  <div className="mt-2 rounded-md bg-white p-2 text-xs text-slate-600">
+                    <p className="font-bold text-slate-900">Rider details</p>
+                    {delivery.courierName || delivery.courierPhone ? (
+                      <>
+                        {delivery.courierName && <p className="mt-1">{delivery.courierName}</p>}
+                        {delivery.courierPhone && <a className="mt-1 block font-bold text-[#0b4ea2]" href={`tel:${delivery.courierPhone}`}>{delivery.courierPhone}</a>}
+                      </>
+                    ) : (
+                      <p className="mt-1">Rider details pending</p>
+                    )}
+                  </div>
                   {delivery.trackingUrl && (
                     <a className="mt-2 inline-flex items-center gap-1 text-sm font-bold text-[#b91c1c]" href={delivery.trackingUrl} target="_blank" rel="noreferrer">
                       Open tracking <ExternalLink className="h-3.5 w-3.5" />
