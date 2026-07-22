@@ -578,7 +578,9 @@ type RequestedItem = { itemType?: string; quantity?: number };
 
 function PricingWorkspace({ order, token, onOrderUpdated, onBack }: { order: Order; token: string; onOrderUpdated: (order: Order) => void; onBack: () => void }) {
   const { showToast } = useToast();
-  const courierDeliveryFee = order.deliveries?.reduce((sum, delivery) => sum + delivery.fee, 0) ?? 0;
+  const courierDeliveryFee = order.deliveries
+    ?.filter((delivery) => !["dispatch_failed", "duplicate_active_pickup", "dispatch_failed_after_payment"].includes(delivery.status) || delivery.paidAt)
+    .reduce((sum, delivery) => sum + delivery.fee, 0) ?? 0;
   const requestedItems = Array.isArray(order.requestedItems) ? order.requestedItems as RequestedItem[] : [];
   const submittedItemNames = Array.from(new Set(requestedItems.map((item) => item.itemType).filter(Boolean))) as string[];
   const initialItemName = submittedItemNames[0] ?? "";

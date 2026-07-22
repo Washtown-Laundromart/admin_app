@@ -44,6 +44,7 @@ Implemented UI:
 - Customer wash requests trigger pickup courier dispatch from the backend immediately. Admin order cards show pickup tracking details and only expose courier dispatch for return delivery when an order is ready.
 - Return delivery dispatch is payment-first: the admin action on a ready order sends the customer a Paystack link for the quoted return delivery fee. The actual courier delivery is created automatically by the backend only after that delivery-fee payment is confirmed.
 - If return delivery payment is already paid but courier creation failed, READY order cards show the dispatch action as a retry and call the same backend delivery endpoint to retry courier creation instead of sending a new payment link.
+- Pricing ignores non-billable failed courier attempts (`dispatch_failed`, `duplicate_active_pickup`, unpaid `dispatch_failed_after_payment`) so a failed retry history does not double-count delivery fees.
 - Admin order cards and logistics cards show courier rider name/phone when Relay or Shipbubble supplies it through delivery webhooks; until then they show `Rider details pending`.
 - Courier provider choices in the admin app are limited to `SHIPBUBBLE` and `RELAY`; unsupported provider integrations were removed while API access is uncertain.
 - Orders in cleaning states (`PAID`, `WASHING`, `DRYING`, `IRONING`, `BAGGED`) can be marked `READY` directly from the order card after cleaning is complete.
