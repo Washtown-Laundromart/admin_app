@@ -392,8 +392,9 @@ function OrderCard({ order, token, onOrderUpdated, onStartPricing }: { order: Or
   const [isUpdating, setIsUpdating] = useState(false);
   const [provider, setProvider] = useState<(typeof courierProviders)[number]>("SHIPBUBBLE");
   const [isDispatching, setIsDispatching] = useState(false);
+  const isReturnDeliveryPaymentPending = order.deliveries?.some((delivery) => delivery.leg === "BRANCH_TO_CUSTOMER" && delivery.status === "return_payment_pending");
   const opensBillWorkspace = order.status === "AWAITING_PAYMENT" || Boolean(order.bill);
-  const canDispatchReturn = order.status === "READY" && order.fulfillmentMethod !== "STORE_PICKUP";
+  const canDispatchReturn = order.status === "READY" && order.fulfillmentMethod !== "STORE_PICKUP" && !isReturnDeliveryPaymentPending;
   const canMarkAtBranchForTesting = ["PICKUP_REQUESTED", "PICKUP_COURIER_ASSIGNED", "PICKED_UP"].includes(order.status);
   const canMarkReady = ["PAID", "WASHING", "DRYING", "IRONING", "BAGGED"].includes(order.status);
 
@@ -424,8 +425,10 @@ function OrderCard({ order, token, onOrderUpdated, onStartPricing }: { order: Or
       onOrderUpdated(result.order);
       showToast({
         type: "success",
-        title: "Courier dispatched",
-        message: `${provider} tracking is now attached to ${order.code}.`
+        title: leg === "BRANCH_TO_CUSTOMER" ? "Delivery payment sent" : "Courier dispatched",
+        message: leg === "BRANCH_TO_CUSTOMER"
+          ? `${provider} return delivery quote was sent to the customer for payment.`
+          : `${provider} tracking is now attached to ${order.code}.`
       });
     } catch (error) {
       showToast({ type: "error", title: "Could not dispatch courier", message: toErrorMessage(error) });
@@ -463,6 +466,11 @@ function OrderCard({ order, token, onOrderUpdated, onStartPricing }: { order: Or
                   Track delivery <ExternalLink className="h-3 w-3" />
                 </a>
               )}
+              {delivery.status === "return_payment_pending" && delivery.paystackUrl && (
+                <a className="mt-2 inline-flex items-center gap-1 font-bold text-[#0b4ea2]" href={delivery.paystackUrl} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>
+                  Open delivery payment <ExternalLink className="h-3 w-3" />
+                </a>
+              )}
             </div>
           ))}
         </div>
@@ -476,7 +484,7 @@ function OrderCard({ order, token, onOrderUpdated, onStartPricing }: { order: Or
             event.stopPropagation();
             dispatchCourier("BRANCH_TO_CUSTOMER");
           }}>
-            <Truck className="h-3.5 w-3.5" /> {isDispatching ? "Dispatching..." : "Dispatch return"}
+            <Truck className="h-3.5 w-3.5" /> {isDispatching ? "Sending quote..." : "Send return delivery fee"}
           </Button>
         </div>
       )}

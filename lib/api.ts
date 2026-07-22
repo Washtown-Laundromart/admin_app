@@ -56,6 +56,8 @@ export type DeliveryJob = {
   status: string;
   fee: number;
   trackingUrl?: string | null;
+  paystackUrl?: string | null;
+  paidAt?: string | null;
   externalDeliveryId?: string | null;
   courierName?: string | null;
   courierPhone?: string | null;

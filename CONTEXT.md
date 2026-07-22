@@ -42,6 +42,7 @@ Implemented UI:
 - Existing bills open in read-only billed state with inspected line items, total, current Paystack link, and a `Resend Paystack link` action that calls `/api/orders/:id/bill/payment-link`.
 - Delivery fee input preloads from stored courier delivery-job fees when available, while still allowing manual/test courier fee entry if provider dispatch did not complete.
 - Customer wash requests trigger pickup courier dispatch from the backend immediately. Admin order cards show pickup tracking details and only expose courier dispatch for return delivery when an order is ready.
+- Return delivery dispatch is payment-first: the admin action on a ready order sends the customer a Paystack link for the quoted return delivery fee. The actual courier delivery is created automatically by the backend only after that delivery-fee payment is confirmed.
 - Courier provider choices in the admin app are limited to `SHIPBUBBLE` and `RELAY`; unsupported provider integrations were removed while API access is uncertain.
 - Orders in cleaning states (`PAID`, `WASHING`, `DRYING`, `IRONING`, `BAGGED`) can be marked `READY` directly from the order card after cleaning is complete.
 - Admin console now has route-backed pages (`/orders`, `/billing`, `/logistics`, `/branches`, `/notifications`, `/audit-logs`, `/settings`) using a shared `AdminConsole` component. Entering a page fetches fresh backend data, and operational pages poll backend data so payment/order status changes appear without manual refresh.
