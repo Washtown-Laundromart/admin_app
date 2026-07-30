@@ -47,7 +47,7 @@ Implemented UI:
 - Pricing ignores non-billable failed courier attempts (`dispatch_failed`, `duplicate_active_pickup`, unpaid `dispatch_failed_after_payment`) so a failed retry history does not double-count delivery fees.
 - Admin order cards and logistics cards show courier rider name/phone when Relay or Shipbubble supplies it through delivery webhooks; until then they show `Rider details pending`.
 - `/users` is a super admin/branch admin page for paginated user management. It shows customer/admin/staff details, order counts, status, branch context, search/role/status filters, and suspend/reactivate actions. Super admins see all branches; branch admins see only branch-connected customers and their branch staff.
-- Courier provider choices in the admin app are limited to `SHIPBUBBLE` and `RELAY`; unsupported provider integrations were removed while API access is uncertain.
+- Courier provider choices in the admin app include `SHIPBUBBLE`, `RELAY`, and `BOLT`.
 - Orders in cleaning states (`PAID`, `WASHING`, `DRYING`, `IRONING`, `BAGGED`) can be marked `READY` directly from the order card after cleaning is complete.
 - Admin console now has route-backed pages (`/orders`, `/billing`, `/logistics`, `/branches`, `/notifications`, `/audit-logs`, `/settings`) using a shared `AdminConsole` component. Entering a page fetches fresh backend data, and operational pages poll backend data so payment/order status changes appear without manual refresh.
 - Logistics view shows live courier queues with empty states when no matching orders exist.

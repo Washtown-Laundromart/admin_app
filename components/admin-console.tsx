@@ -57,7 +57,7 @@ const orderColumns = [
   { title: "Ready", statuses: ["READY", "OUT_FOR_DELIVERY", "DELIVERED", "READY_FOR_PICKUP", "COLLECTED"] }
 ];
 
-const courierProviders = ["SHIPBUBBLE", "RELAY"] as const;
+const courierProviders = ["SHIPBUBBLE", "RELAY", "BOLT"] as const;
 
 const pagePaths: Record<Exclude<AdminPage, "pricing">, string> = {
   dashboard: "/",
