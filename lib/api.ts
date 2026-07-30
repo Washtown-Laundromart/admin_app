@@ -11,7 +11,11 @@ export type ApiUser = {
   defaultAddress?: string | null;
   role: AdminRole | "CUSTOMER";
   branchId?: string | null;
+  branch?: Branch | null;
+  isActive?: boolean;
+  orderCount?: number;
   createdAt?: string;
+  updatedAt?: string;
 };
 
 export type AuthResponse = {
@@ -101,6 +105,14 @@ export type AuditLogPage = {
   pageSize: number;
   totalPages: number;
   actions: string[];
+};
+
+export type UserDirectoryPage = {
+  data: ApiUser[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
 };
 
 export type AnalyticsResponse = {

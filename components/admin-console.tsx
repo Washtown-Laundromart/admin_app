@@ -21,8 +21,10 @@ import {
   Route,
   Settings,
   Truck,
+  UserCheck,
   Users,
-  UserPlus
+  UserPlus,
+  UserX
 } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import jsPDF from "jspdf";
@@ -30,15 +32,16 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/toast-provider";
-import { API_BASE_URL, apiFetch, toErrorMessage, type AdminRole, type AnalyticsResponse, type ApiUser, type AuditLog, type AuditLogPage, type Branch, type Order } from "@/lib/api";
+import { API_BASE_URL, apiFetch, toErrorMessage, type AdminRole, type AnalyticsResponse, type ApiUser, type AuditLog, type AuditLogPage, type Branch, type Order, type UserDirectoryPage } from "@/lib/api";
 import { useAdminStore } from "@/lib/store";
 
-type AdminPage = "dashboard" | "orders" | "pricing" | "branches" | "notifications" | "logistics" | "billing" | "audit" | "settings";
+type AdminPage = "dashboard" | "orders" | "pricing" | "branches" | "users" | "notifications" | "logistics" | "billing" | "audit" | "settings";
 
 const navItems = [
   ["dashboard", LayoutDashboard, "Dashboard"],
   ["orders", PackageCheck, "Orders"],
   ["branches", Building2, "Branches"],
+  ["users", Users, "Users"],
   ["notifications", Bell, "Notifications"],
   ["logistics", Route, "Logistics"],
   ["billing", CreditCard, "Billing"],
@@ -60,6 +63,7 @@ const pagePaths: Record<Exclude<AdminPage, "pricing">, string> = {
   dashboard: "/",
   orders: "/orders",
   branches: "/branches",
+  users: "/users",
   notifications: "/notifications",
   logistics: "/logistics",
   billing: "/billing",
@@ -81,6 +85,7 @@ export function AdminConsole({ page }: { page: AdminPage }) {
   const [pricingOrderId, setPricingOrderId] = useState<string>();
   const visibleNavItems = useMemo(() => navItems.filter(([id]) => {
     if (id === "branches") return role === "SUPER_ADMIN" || role === "BRANCH_ADMIN";
+    if (id === "users") return role === "SUPER_ADMIN" || role === "BRANCH_ADMIN";
     if (id === "audit") return role === "SUPER_ADMIN" || role === "BRANCH_ADMIN";
     return true;
   }), [role]);
@@ -140,7 +145,7 @@ export function AdminConsole({ page }: { page: AdminPage }) {
   }, [range.from, range.to, token, page]);
 
   useEffect(() => {
-    if (role === "BRANCH_STAFF" && (view === "branches" || view === "audit")) window.location.href = "/";
+    if (role === "BRANCH_STAFF" && (view === "branches" || view === "users" || view === "audit")) window.location.href = "/";
   }, [role, view]);
 
   const cards = useMemo(() => [
@@ -267,6 +272,7 @@ export function AdminConsole({ page }: { page: AdminPage }) {
               {view === "pricing" && pricingOrder && <PricingWorkspace order={pricingOrder} token={token} onBack={() => navigate("orders")} onOrderUpdated={mergeOrder} />}
               {view === "billing" && <BillingOps orders={orders} onStartPricing={openPricing} />}
               {view === "branches" && (role === "SUPER_ADMIN" || role === "BRANCH_ADMIN") && <BranchManagement branches={branches} branchUsers={branchUsers} token={token} role={role} assignedBranchId={branchId} onCreated={(branch) => setBranches((current) => [...current, branch])} onAdminCreated={(user) => setBranchUsers((current) => [user, ...current])} />}
+              {view === "users" && (role === "SUPER_ADMIN" || role === "BRANCH_ADMIN") && <UserDirectory token={token} branches={branches} role={role} />}
               {view === "notifications" && <NotificationsComposer customers={customers} token={token} />}
               {view === "logistics" && <Logistics orders={orders} />}
               {view === "audit" && <AuditLogs token={token} branches={branches} role={role} />}
@@ -1129,6 +1135,127 @@ function Logistics({ orders }: { orders: Order[] }) {
           </div>
         ))}
         {!deliveryOrders.length && <EmptyState title="No active courier jobs" detail="Pickup and return delivery jobs will appear here." />}
+      </div>
+    </Card>
+  );
+}
+
+function UserDirectory({ token, branches, role }: { token: string; branches: Branch[]; role: AdminRole }) {
+  const { showToast } = useToast();
+  const [users, setUsers] = useState<ApiUser[]>([]);
+  const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [updatingUserId, setUpdatingUserId] = useState<string>();
+  const branchName = (user: ApiUser) => user.branch?.name ?? branches.find((branch) => branch.id === user.branchId)?.name ?? (user.role === "CUSTOMER" ? "Customer" : "No branch");
+
+  useEffect(() => {
+    const handle = window.setTimeout(() => setPage(1), 250);
+    return () => window.clearTimeout(handle);
+  }, [search, roleFilter, statusFilter]);
+
+  useEffect(() => {
+    const params = new URLSearchParams({
+      page: String(page),
+      pageSize: "20"
+    });
+    if (search.trim()) params.set("search", search.trim());
+    if (roleFilter) params.set("role", roleFilter);
+    if (statusFilter) params.set("status", statusFilter);
+    setIsLoading(true);
+    apiFetch<UserDirectoryPage>(`/api/admin/user-directory?${params.toString()}`, {}, token).then((result) => {
+      setUsers(result.data);
+      setTotal(result.total);
+      setTotalPages(result.totalPages);
+    }).catch((error) => {
+      showToast({ type: "error", title: "Could not load users", message: toErrorMessage(error) });
+    }).finally(() => setIsLoading(false));
+  }, [page, roleFilter, search, showToast, statusFilter, token]);
+
+  async function updateStatus(user: ApiUser, isActive: boolean) {
+    setUpdatingUserId(user.id);
+    try {
+      const updated = await apiFetch<ApiUser>(`/api/admin/user-directory/${user.id}/status`, {
+        method: "PATCH",
+        body: JSON.stringify({ isActive })
+      }, token);
+      setUsers((current) => current.map((item) => item.id === updated.id ? { ...item, ...updated } : item));
+      showToast({ type: "success", title: isActive ? "User reactivated" : "User suspended", message: `${updated.fullName} has been updated.` });
+    } catch (error) {
+      showToast({ type: "error", title: "Could not update user", message: toErrorMessage(error) });
+    } finally {
+      setUpdatingUserId(undefined);
+    }
+  }
+
+  return (
+    <Card className="border-0 p-5 shadow-sm">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <h2 className="flex items-center gap-2 text-2xl font-bold"><Users className="h-6 w-6 text-[#df1f2d]" /> Users</h2>
+          <p className="mt-2 text-sm text-slate-500">{role === "SUPER_ADMIN" ? "All customer, branch admin, and staff accounts across every branch." : "Customer and staff accounts connected to your branch."}</p>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-3 lg:min-w-[620px]">
+          <Input placeholder="Search name, email, phone" value={search} onChange={setSearch} />
+          <select className="h-12 rounded-lg border border-slate-200 bg-white px-3 text-sm" value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)}>
+            <option value="">All roles</option>
+            <option value="CUSTOMER">Customers</option>
+            <option value="BRANCH_ADMIN">Branch admins</option>
+            <option value="BRANCH_STAFF">Staff</option>
+          </select>
+          <select className="h-12 rounded-lg border border-slate-200 bg-white px-3 text-sm" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+            <option value="">All statuses</option>
+            <option value="active">Active</option>
+            <option value="suspended">Suspended</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-3">
+        {isLoading && Array.from({ length: 6 }).map((_, index) => (
+          <div key={index} className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <Skeleton className="h-5 w-48" />
+            <Skeleton className="mt-3 h-4 w-3/4" />
+          </div>
+        ))}
+        {!isLoading && users.map((user) => (
+          <div key={user.id} className="rounded-lg border border-slate-200 bg-white p-4">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-bold">{user.fullName}</p>
+                  <span className={`rounded-full px-2 py-1 text-xs font-bold ${user.isActive === false ? "bg-red-50 text-red-700" : "bg-blue-50 text-blue-700"}`}>{user.isActive === false ? "Suspended" : "Active"}</span>
+                  <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-bold text-slate-600">{formatStatus(user.role)}</span>
+                </div>
+                <p className="mt-1 break-all text-sm text-slate-500">{user.email}</p>
+                <p className="mt-1 text-sm text-slate-500">{user.phone ?? "No phone"} · {branchName(user)}</p>
+                {user.defaultAddress && <p className="mt-1 text-sm text-slate-500">{user.defaultAddress}</p>}
+              </div>
+              <div className="grid gap-2 sm:grid-cols-[110px_140px_160px]">
+                <ReadOnlyValue label="Orders" value={String(user.orderCount ?? 0)} />
+                <ReadOnlyValue label="Joined" value={user.createdAt ? new Date(user.createdAt).toLocaleDateString() : "Unknown"} />
+                {user.role !== "SUPER_ADMIN" && (
+                  <Button className={`h-12 ${user.isActive === false ? "bg-[#0b4ea2] hover:bg-[#073b78]" : "bg-white text-[#b91c1c] ring-1 ring-red-100 hover:bg-red-50"}`} disabled={updatingUserId === user.id} onClick={() => updateStatus(user, user.isActive === false)}>
+                    {user.isActive === false ? <UserCheck className="h-4 w-4" /> : <UserX className="h-4 w-4" />} {updatingUserId === user.id ? "Updating..." : user.isActive === false ? "Reactivate" : "Suspend"}
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+        {!isLoading && !users.length && <EmptyState title="No users found" detail="Try a different search, role, or status filter." />}
+      </div>
+
+      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 text-sm font-semibold text-slate-500">
+        <span>{total} users · Page {page} of {totalPages}</span>
+        <div className="flex gap-2">
+          <Button className="h-9 bg-white px-3 text-[#0b4ea2] ring-1 ring-slate-200 hover:bg-slate-50" disabled={page <= 1} onClick={() => setPage((current) => Math.max(1, current - 1))}>Previous</Button>
+          <Button className="h-9 bg-white px-3 text-[#0b4ea2] ring-1 ring-slate-200 hover:bg-slate-50" disabled={page >= totalPages} onClick={() => setPage((current) => Math.min(totalPages, current + 1))}>Next</Button>
+        </div>
       </div>
     </Card>
   );
