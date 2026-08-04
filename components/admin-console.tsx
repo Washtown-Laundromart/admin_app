@@ -594,6 +594,8 @@ function PricingWorkspace({ order, token, onOrderUpdated, onBack }: { order: Ord
   const [deliveryFee, setDeliveryFee] = useState(String(order.bill?.deliveryFee ?? courierDeliveryFee));
   const [isSaving, setIsSaving] = useState(false);
   const [isResending, setIsResending] = useState(false);
+  const [adminNote, setAdminNote] = useState("");
+  const [isAddingNote, setIsAddingNote] = useState(false);
   const subtotal = items.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unitPrice || 0), 0);
   const total = subtotal + Number(deliveryFee || 0);
 
@@ -612,6 +614,24 @@ function PricingWorkspace({ order, token, onOrderUpdated, onBack }: { order: Ord
       const nextName = submittedItemNames.find((name) => !current.some((item) => item.itemName === name)) ?? submittedItemNames[0] ?? "";
       return [...current, { itemName: nextName, serviceType: "Wash and fold", quantity: "1", unitPrice: "" }];
     });
+  }
+
+  async function addAdminNote() {
+    if (!adminNote.trim()) return;
+    setIsAddingNote(true);
+    try {
+      const updated = await apiFetch<Order>(`/api/orders/${order.id}/note`, {
+        method: "PATCH",
+        body: JSON.stringify({ note: adminNote.trim() })
+      }, token);
+      onOrderUpdated(updated);
+      setAdminNote("");
+      showToast({ type: "success", title: "Note added", message: "Your note has been appended to the customer notes." });
+    } catch (error) {
+      showToast({ type: "error", title: "Could not add note", message: toErrorMessage(error) });
+    } finally {
+      setIsAddingNote(false);
+    }
   }
 
   async function saveBill() {
@@ -695,12 +715,29 @@ function PricingWorkspace({ order, token, onOrderUpdated, onBack }: { order: Ord
               {!requestedItems.length && <p className="rounded-lg border border-dashed border-slate-200 p-3 text-sm text-slate-500">No item estimate was submitted.</p>}
             </div>
           </div>
-          {order.customerNote && (
-            <div className="mt-5">
-              <p className="text-xs font-bold uppercase text-slate-400">Customer note</p>
-              <p className="mt-2 rounded-lg bg-slate-50 p-3 text-sm text-slate-600 whitespace-pre-wrap">{order.customerNote}</p>
+          <div className="mt-5">
+            <p className="text-xs font-bold uppercase text-slate-400">Customer note</p>
+            {order.customerNote
+              ? <p className="mt-2 rounded-lg bg-slate-50 p-3 text-sm text-slate-600 whitespace-pre-wrap">{order.customerNote}</p>
+              : <p className="mt-2 rounded-lg border border-dashed border-slate-200 p-3 text-sm text-slate-400">No note from customer.</p>
+            }
+            <div className="mt-3">
+              <textarea
+                className="w-full rounded-lg border border-slate-200 bg-white p-3 text-sm outline-none focus:border-[#0b4ea2]"
+                rows={2}
+                placeholder="Add a note (e.g. customer called to add more items)..."
+                value={adminNote}
+                onChange={(event) => setAdminNote(event.target.value)}
+              />
+              <Button
+                className="mt-2 h-9 bg-white px-3 text-sm text-[#0b4ea2] ring-1 ring-slate-200 hover:bg-slate-50 disabled:opacity-50"
+                disabled={!adminNote.trim() || isAddingNote}
+                onClick={addAdminNote}
+              >
+                {isAddingNote ? "Adding..." : "Add note"}
+              </Button>
             </div>
-          )}
+          </div>
           {!!order.photoUrls?.length && (
             <div className="mt-5">
               <p className="text-xs font-bold uppercase text-slate-400">Photos</p>
