@@ -372,23 +372,69 @@ function KpiCard({ label, value, helper }: { label: string; value: string; helpe
 }
 
 function OrdersPipeline({ orders, token, onOrderUpdated, onStartPricing }: { orders: Order[]; token: string; onOrderUpdated: (order: Order) => void; onStartPricing: (order: Order) => void }) {
+  const [search, setSearch] = useState("");
+  const query = search.trim().toLowerCase();
+  const visibleOrders = query
+    ? orders.filter((order) =>
+        order.code.toLowerCase().includes(query) ||
+        (order.customer?.fullName ?? "").toLowerCase().includes(query) ||
+        (order.customer?.phone ?? "").toLowerCase().includes(query)
+      )
+    : orders;
+
   return (
-    <div className="grid gap-4 xl:grid-cols-5">
-      {orderColumns.map((column) => {
-        const columnOrders = orders.filter((order) => column.statuses.includes(order.status));
-        return (
-          <Card key={column.title} className="min-h-[360px] border-0 bg-white p-4 shadow-sm">
-            <div className="mb-4 flex items-center justify-between">
-              <h3 className="font-bold">{column.title}</h3>
-              <span className="rounded-full bg-red-50 px-2 py-1 text-xs font-bold text-red-700">{columnOrders.length}</span>
-            </div>
-            <div className="space-y-3">
-              {columnOrders.map((order) => <OrderCard key={order.id} order={order} token={token} onOrderUpdated={onOrderUpdated} onStartPricing={onStartPricing} />)}
-              {!columnOrders.length && <p className="rounded-lg border border-dashed border-slate-200 p-4 text-sm text-slate-500">No orders in this stage.</p>}
-            </div>
-          </Card>
-        );
-      })}
+    <div className="space-y-4">
+      <div className="relative">
+        <input
+          type="text"
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Search by order ID, customer name or phone number..."
+          className="h-11 w-full rounded-lg border border-slate-200 bg-white pl-4 pr-10 text-sm outline-none focus:border-[#0b4ea2]"
+        />
+        {search && (
+          <button
+            type="button"
+            onClick={() => setSearch("")}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+            aria-label="Clear search"
+          >
+            ✕
+          </button>
+        )}
+      </div>
+      {query && (
+        <p className="text-sm text-slate-500">
+          {visibleOrders.length === 0
+            ? "No orders match your search."
+            : `${visibleOrders.length} order${visibleOrders.length === 1 ? "" : "s"} found`}
+        </p>
+      )}
+      {query ? (
+        <div className="space-y-3">
+          {visibleOrders.map((order) => (
+            <OrderCard key={order.id} order={order} token={token} onOrderUpdated={onOrderUpdated} onStartPricing={onStartPricing} />
+          ))}
+        </div>
+      ) : (
+        <div className="grid gap-4 xl:grid-cols-5">
+          {orderColumns.map((column) => {
+            const columnOrders = visibleOrders.filter((order) => column.statuses.includes(order.status));
+            return (
+              <Card key={column.title} className="min-h-[360px] border-0 bg-white p-4 shadow-sm">
+                <div className="mb-4 flex items-center justify-between">
+                  <h3 className="font-bold">{column.title}</h3>
+                  <span className="rounded-full bg-red-50 px-2 py-1 text-xs font-bold text-red-700">{columnOrders.length}</span>
+                </div>
+                <div className="space-y-3">
+                  {columnOrders.map((order) => <OrderCard key={order.id} order={order} token={token} onOrderUpdated={onOrderUpdated} onStartPricing={onStartPricing} />)}
+                  {!columnOrders.length && <p className="rounded-lg border border-dashed border-slate-200 p-4 text-sm text-slate-500">No orders in this stage.</p>}
+                </div>
+              </Card>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
