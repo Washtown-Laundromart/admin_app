@@ -628,6 +628,10 @@ function BillingOps({ orders, onStartPricing }: { orders: Order[]; onStartPricin
 
 type RequestedItem = { itemType?: string; quantity?: number };
 
+function normalizeItemName(name: string) {
+  return name.trim().toLowerCase();
+}
+
 function PricingWorkspace({ order, token, onOrderUpdated, onBack }: { order: Order; token: string; onOrderUpdated: (order: Order) => void; onBack: () => void }) {
   const { showToast } = useToast();
   const courierDeliveryFee = order.deliveries
@@ -644,6 +648,16 @@ function PricingWorkspace({ order, token, onOrderUpdated, onBack }: { order: Ord
   const [isAddingNote, setIsAddingNote] = useState(false);
   const subtotal = items.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unitPrice || 0), 0);
   const total = subtotal + Number(deliveryFee || 0);
+  const validPricingItems = items.filter((item) => (
+    item.itemName.trim() &&
+    item.serviceType.trim() &&
+    Number(item.quantity) > 0 &&
+    item.unitPrice.trim() !== "" &&
+    Number(item.unitPrice) >= 0
+  ));
+  const pricedItemNames = new Set(validPricingItems.map((item) => normalizeItemName(item.itemName)));
+  const missingSubmittedItemNames = submittedItemNames.filter((name) => !pricedItemNames.has(normalizeItemName(name)));
+  const canCreateBill = validPricingItems.length > 0 && missingSubmittedItemNames.length === 0;
 
   useEffect(() => {
     if (order.bill) return;
@@ -681,12 +695,20 @@ function PricingWorkspace({ order, token, onOrderUpdated, onBack }: { order: Ord
   }
 
   async function saveBill() {
-    const payloadItems = items.map((item) => ({
+    if (missingSubmittedItemNames.length) {
+      showToast({
+        type: "error",
+        title: "Billing incomplete",
+        message: `Price ${missingSubmittedItemNames.join(", ")} before creating this bill.`
+      });
+      return;
+    }
+    const payloadItems = validPricingItems.map((item) => ({
       itemName: item.itemName.trim(),
       serviceType: item.serviceType.trim(),
       quantity: Number(item.quantity),
       unitPrice: Number(item.unitPrice)
-    })).filter((item) => item.itemName && item.serviceType && item.quantity > 0 && item.unitPrice >= 0);
+    }));
     if (!payloadItems.length) {
       showToast({ type: "error", title: "Inspection is empty", message: "Add at least one priced clothing item." });
       return;
@@ -836,11 +858,12 @@ function PricingWorkspace({ order, token, onOrderUpdated, onBack }: { order: Ord
                 <Button className="h-12 bg-white px-3 text-[#0b4ea2] ring-1 ring-slate-200 hover:bg-slate-50" onClick={addPricingItem}>
                   <Plus className="h-4 w-4" /> Item
                 </Button>
-                <Button className="h-12 px-3" disabled={isSaving} onClick={saveBill}>
+                <Button className={`h-12 px-3 ${!canCreateBill && !isSaving ? "cursor-not-allowed opacity-60" : ""}`} disabled={isSaving} aria-disabled={!canCreateBill || isSaving} onClick={saveBill}>
                   <CreditCard className="h-4 w-4" /> Create bill
                 </Button>
               </div>
               <p className="text-sm font-bold text-slate-600">Total: {formatNaira(total)}</p>
+              {!!missingSubmittedItemNames.length && <p className="text-xs font-semibold text-[#b91c1c]">Missing pricing for: {missingSubmittedItemNames.join(", ")}</p>}
               {!!courierDeliveryFee && <p className="text-xs font-semibold text-slate-500">Courier fee from delivery provider: {formatNaira(courierDeliveryFee)}</p>}
             </div>
           )}
