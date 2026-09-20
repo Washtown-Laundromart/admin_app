@@ -448,6 +448,7 @@ function OrderCard({ order, token, onOrderUpdated, onStartPricing }: { order: Or
   const hasPaidFailedReturnDispatch = order.deliveries?.some((delivery) => delivery.leg === "BRANCH_TO_CUSTOMER" && delivery.status === "dispatch_failed_after_payment" && delivery.paidAt);
   const opensBillWorkspace = order.status === "AWAITING_PAYMENT" || Boolean(order.bill);
   const canDispatchReturn = order.status === "READY" && order.fulfillmentMethod !== "STORE_PICKUP" && (!isReturnDeliveryPaymentPending || hasPaidFailedReturnDispatch);
+  const canMarkSelfPickup = order.status === "READY" && order.fulfillmentMethod !== "STORE_PICKUP";
   const canMarkAtBranchForTesting = ["PICKUP_REQUESTED", "PICKUP_COURIER_ASSIGNED", "PICKED_UP"].includes(order.status);
   const canMarkReady = ["PAID", "WASHING", "DRYING", "IRONING", "BAGGED"].includes(order.status);
 
@@ -487,6 +488,19 @@ function OrderCard({ order, token, onOrderUpdated, onStartPricing }: { order: Or
       showToast({ type: "error", title: "Could not dispatch courier", message: toErrorMessage(error) });
     } finally {
       setIsDispatching(false);
+    }
+  }
+
+  async function markSelfPickup() {
+    setIsUpdating(true);
+    try {
+      const result = await apiFetch<{ order: Order }>(`/api/orders/${order.id}/self-pickup`, { method: "POST" }, token);
+      onOrderUpdated(result.order);
+      showToast({ type: "success", title: "Self pickup set", message: `${order.code} is ready for customer pickup.` });
+    } catch (error) {
+      showToast({ type: "error", title: "Could not mark self pickup", message: toErrorMessage(error) });
+    } finally {
+      setIsUpdating(false);
     }
   }
 
@@ -551,6 +565,14 @@ function OrderCard({ order, token, onOrderUpdated, onStartPricing }: { order: Or
             <Truck className="h-3.5 w-3.5" /> {isDispatching ? hasPaidFailedReturnDispatch ? "Retrying..." : "Sending quote..." : hasPaidFailedReturnDispatch ? "Retry return dispatch" : "Send return delivery fee"}
           </Button>
         </div>
+      )}
+      {canMarkSelfPickup && (
+        <Button className="mt-2 h-9 w-full bg-white px-3 text-xs text-[#0b4ea2] ring-1 ring-slate-200 hover:bg-slate-50" disabled={isUpdating} onClick={(event) => {
+          event.stopPropagation();
+          markSelfPickup();
+        }}>
+          <PackageCheck className="h-3.5 w-3.5" /> Mark self pickup
+        </Button>
       )}
       <div className="mt-3 flex flex-wrap gap-2">
         {canMarkAtBranchForTesting && (
@@ -648,16 +670,35 @@ function PricingWorkspace({ order, token, onOrderUpdated, onBack }: { order: Ord
   const [isAddingNote, setIsAddingNote] = useState(false);
   const subtotal = items.reduce((sum, item) => sum + Number(item.quantity || 0) * Number(item.unitPrice || 0), 0);
   const total = subtotal + Number(deliveryFee || 0);
+  const submittedQuantities = requestedItems.reduce((totals, item) => {
+    const name = item.itemType?.trim();
+    const quantity = Number(item.quantity ?? 0);
+    if (name && quantity > 0) totals.set(normalizeItemName(name), (totals.get(normalizeItemName(name)) ?? 0) + quantity);
+    return totals;
+  }, new Map<string, number>());
   const validPricingItems = items.filter((item) => (
     item.itemName.trim() &&
     item.serviceType.trim() &&
+    Number.isInteger(Number(item.quantity)) &&
     Number(item.quantity) > 0 &&
     item.unitPrice.trim() !== "" &&
     Number(item.unitPrice) >= 0
   ));
   const pricedItemNames = new Set(validPricingItems.map((item) => normalizeItemName(item.itemName)));
   const missingSubmittedItemNames = submittedItemNames.filter((name) => !pricedItemNames.has(normalizeItemName(name)));
-  const canCreateBill = validPricingItems.length > 0 && missingSubmittedItemNames.length === 0;
+  const billedQuantities = validPricingItems.reduce((totals, item) => {
+    const key = normalizeItemName(item.itemName);
+    totals.set(key, (totals.get(key) ?? 0) + Number(item.quantity));
+    return totals;
+  }, new Map<string, number>());
+  const quantityMismatches = submittedItemNames
+    .map((name) => ({
+      name,
+      requested: submittedQuantities.get(normalizeItemName(name)) ?? 0,
+      billed: billedQuantities.get(normalizeItemName(name)) ?? 0
+    }))
+    .filter((item) => item.requested > 0 && item.billed !== item.requested);
+  const canCreateBill = validPricingItems.length > 0 && missingSubmittedItemNames.length === 0 && quantityMismatches.length === 0;
 
   useEffect(() => {
     if (order.bill) return;
@@ -700,6 +741,15 @@ function PricingWorkspace({ order, token, onOrderUpdated, onBack }: { order: Ord
         type: "error",
         title: "Billing incomplete",
         message: `Price ${missingSubmittedItemNames.join(", ")} before creating this bill.`
+      });
+      return;
+    }
+    if (quantityMismatches.length) {
+      const mismatch = quantityMismatches[0];
+      showToast({
+        type: "error",
+        title: "Quantity mismatch",
+        message: `${mismatch.name} was submitted as ${mismatch.requested}, but you billed ${mismatch.billed}.`
       });
       return;
     }
@@ -864,6 +914,7 @@ function PricingWorkspace({ order, token, onOrderUpdated, onBack }: { order: Ord
               </div>
               <p className="text-sm font-bold text-slate-600">Total: {formatNaira(total)}</p>
               {!!missingSubmittedItemNames.length && <p className="text-xs font-semibold text-[#b91c1c]">Missing pricing for: {missingSubmittedItemNames.join(", ")}</p>}
+              {!!quantityMismatches.length && <p className="text-xs font-semibold text-[#b91c1c]">Quantity mismatch: {quantityMismatches.map((item) => `${item.name} submitted ${item.requested}, billed ${item.billed}`).join("; ")}</p>}
               {!!courierDeliveryFee && <p className="text-xs font-semibold text-slate-500">Courier fee from delivery provider: {formatNaira(courierDeliveryFee)}</p>}
             </div>
           )}
