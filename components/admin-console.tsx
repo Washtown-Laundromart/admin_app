@@ -9,6 +9,7 @@ import {
   Calendar,
   CreditCard,
   Download,
+  Trash2,
   Eye,
   EyeOff,
   ExternalLink,
@@ -271,7 +272,7 @@ export function AdminConsole({ page }: { page: AdminPage }) {
               {view === "orders" && <OrdersPipeline orders={orders} token={token} onOrderUpdated={mergeOrder} onStartPricing={openPricing} />}
               {view === "pricing" && pricingOrder && <PricingWorkspace order={pricingOrder} token={token} onBack={() => navigate("orders")} onOrderUpdated={mergeOrder} />}
               {view === "billing" && <BillingOps orders={orders} onStartPricing={openPricing} />}
-              {view === "branches" && (role === "SUPER_ADMIN" || role === "BRANCH_ADMIN") && <BranchManagement branches={branches} branchUsers={branchUsers} token={token} role={role} assignedBranchId={branchId} onCreated={(branch) => setBranches((current) => [...current, branch])} onAdminCreated={(user) => setBranchUsers((current) => [user, ...current])} />}
+              {view === "branches" && (role === "SUPER_ADMIN" || role === "BRANCH_ADMIN") && <BranchManagement branches={branches} branchUsers={branchUsers} token={token} role={role} assignedBranchId={branchId} onCreated={(branch) => setBranches((current) => [...current, branch])} onDeleted={(branchId) => setBranches((current) => current.filter((branch) => branch.id !== branchId))} onAdminCreated={(user) => setBranchUsers((current) => [user, ...current])} onUserUpdated={(user) => setBranchUsers((current) => current.map((item) => item.id === user.id ? user : item))} />}
               {view === "users" && (role === "SUPER_ADMIN" || role === "BRANCH_ADMIN") && <UserDirectory token={token} branches={branches} role={role} />}
               {view === "notifications" && <NotificationsComposer customers={customers} token={token} />}
               {view === "logistics" && <Logistics orders={orders} />}
@@ -924,7 +925,27 @@ function PricingWorkspace({ order, token, onOrderUpdated, onBack }: { order: Ord
   );
 }
 
-function BranchManagement({ branches, branchUsers, token, role, assignedBranchId, onCreated, onAdminCreated }: { branches: Branch[]; branchUsers: ApiUser[]; token: string; role: AdminRole; assignedBranchId?: string; onCreated: (branch: Branch) => void; onAdminCreated: (user: ApiUser) => void }) {
+function BranchManagement({
+  branches,
+  branchUsers,
+  token,
+  role,
+  assignedBranchId,
+  onCreated,
+  onDeleted,
+  onAdminCreated,
+  onUserUpdated
+}: {
+  branches: Branch[];
+  branchUsers: ApiUser[];
+  token: string;
+  role: AdminRole;
+  assignedBranchId?: string;
+  onCreated: (branch: Branch) => void;
+  onDeleted: (branchId: string) => void;
+  onAdminCreated: (user: ApiUser) => void;
+  onUserUpdated: (user: ApiUser) => void;
+}) {
   const { showToast } = useToast();
   const canCreateBranches = role === "SUPER_ADMIN";
   const manageableBranches = useMemo(() => canCreateBranches ? branches : branches.filter((branch) => branch.id === assignedBranchId), [assignedBranchId, branches, canCreateBranches]);
@@ -1098,16 +1119,87 @@ function BranchManagement({ branches, branchUsers, token, role, assignedBranchId
         pageCount={pageCount}
         selectedBranchId={selectedBranchId}
         visibleBranches={visibleBranches}
+        token={token}
+        role={role}
         onPageChange={setBranchPage}
         onSelectBranch={setSelectedBranchId}
+        onDeleted={onDeleted}
+        onUserUpdated={onUserUpdated}
       />
     </div>
   );
 }
 
-function BranchDirectory({ branches, branchUsers, visibleBranches, selectedBranchId, page, pageCount, onPageChange, onSelectBranch }: { branches: Branch[]; branchUsers: ApiUser[]; visibleBranches: Branch[]; selectedBranchId: string; page: number; pageCount: number; onPageChange: (page: number) => void; onSelectBranch: (branchId: string) => void }) {
+function BranchDirectory({
+  branches,
+  branchUsers,
+  visibleBranches,
+  selectedBranchId,
+  page,
+  pageCount,
+  token,
+  role,
+  onPageChange,
+  onSelectBranch,
+  onDeleted,
+  onUserUpdated
+}: {
+  branches: Branch[];
+  branchUsers: ApiUser[];
+  visibleBranches: Branch[];
+  selectedBranchId: string;
+  page: number;
+  pageCount: number;
+  token: string;
+  role: AdminRole;
+  onPageChange: (page: number) => void;
+  onSelectBranch: (branchId: string) => void;
+  onDeleted: (branchId: string) => void;
+  onUserUpdated: (user: ApiUser) => void;
+}) {
+  const { showToast } = useToast();
   const selectedBranch = branches.find((branch) => branch.id === selectedBranchId);
   const selectedUsers = branchUsers.filter((user) => user.branchId === selectedBranchId);
+  const canManageBranches = role === "SUPER_ADMIN";
+  const [deleteTarget, setDeleteTarget] = useState<Branch | null>(null);
+  const [isDeletingBranch, setIsDeletingBranch] = useState(false);
+  const [updatingRoleUserId, setUpdatingRoleUserId] = useState<string | null>(null);
+
+  async function deleteBranch() {
+    if (!deleteTarget) return;
+    setIsDeletingBranch(true);
+    try {
+      await apiFetch<Branch>(`/api/branches/${deleteTarget.id}`, { method: "DELETE" }, token);
+      onDeleted(deleteTarget.id);
+      if (selectedBranchId === deleteTarget.id) {
+        const nextBranch = branches.find((branch) => branch.id !== deleteTarget.id);
+        onSelectBranch(nextBranch?.id ?? "");
+      }
+      setDeleteTarget(null);
+      showToast({ type: "success", title: "Branch deleted", message: `${deleteTarget.name} has been removed from active branches.` });
+    } catch (error) {
+      showToast({ type: "error", title: "Could not delete branch", message: toErrorMessage(error) });
+    } finally {
+      setIsDeletingBranch(false);
+    }
+  }
+
+  async function changeUserRole(user: ApiUser, nextRole: "BRANCH_ADMIN" | "BRANCH_STAFF") {
+    if (user.role === nextRole) return;
+    setUpdatingRoleUserId(user.id);
+    try {
+      const updated = await apiFetch<ApiUser>(`/api/admin/user-directory/${user.id}/role`, {
+        method: "PATCH",
+        body: JSON.stringify({ role: nextRole })
+      }, token);
+      onUserUpdated(updated);
+      showToast({ type: "success", title: "Role updated", message: `${updated.fullName} is now ${formatStatus(updated.role)}.` });
+    } catch (error) {
+      showToast({ type: "error", title: "Could not update role", message: toErrorMessage(error) });
+    } finally {
+      setUpdatingRoleUserId(null);
+    }
+  }
 
   return (
     <div className="grid gap-5 xl:grid-cols-[1fr_420px]">
@@ -1128,7 +1220,8 @@ function BranchDirectory({ branches, branchUsers, visibleBranches, selectedBranc
             const usersForBranch = branchUsers.filter((user) => user.branchId === branch.id);
             const isSelected = branch.id === selectedBranchId;
             return (
-              <button key={branch.id} className={`rounded-lg border p-4 text-left transition ${isSelected ? "border-[#df1f2d] bg-red-50" : "border-slate-200 bg-white hover:border-slate-300"}`} onClick={() => onSelectBranch(branch.id)}>
+              <div key={branch.id} className={`rounded-lg border p-4 text-left transition ${isSelected ? "border-[#df1f2d] bg-red-50" : "border-slate-200 bg-white hover:border-slate-300"}`}>
+                <button className="w-full text-left" onClick={() => onSelectBranch(branch.id)}>
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="font-bold text-slate-950">{branch.name}</p>
@@ -1141,7 +1234,13 @@ function BranchDirectory({ branches, branchUsers, visibleBranches, selectedBranc
                   <ReadOnlyValue label="Staff" value={String(usersForBranch.filter((user) => user.role === "BRANCH_STAFF").length)} />
                 </div>
                 <p className="mt-3 text-xs font-semibold text-slate-500">Slug: {branch.slug}</p>
-              </button>
+                </button>
+                {canManageBranches && (
+                  <Button className="mt-4 h-9 w-full bg-white text-red-700 ring-1 ring-red-200 hover:bg-red-50" onClick={() => setDeleteTarget(branch)}>
+                    <Trash2 className="h-4 w-4" /> Delete branch
+                  </Button>
+                )}
+              </div>
             );
           })}
           {!branches.length && <div className="md:col-span-2"><EmptyState title="No branches yet" detail="Create a branch above, then assign its admin or staff." /></div>}
@@ -1164,6 +1263,20 @@ function BranchDirectory({ branches, branchUsers, visibleBranches, selectedBranc
                     </div>
                     <span className="shrink-0 rounded-full bg-red-50 px-2 py-1 text-xs font-bold text-red-700">{user.role === "BRANCH_ADMIN" ? "Admin" : "Staff"}</span>
                   </div>
+                  {canManageBranches && (user.role === "BRANCH_ADMIN" || user.role === "BRANCH_STAFF") && (
+                    <div className="mt-3">
+                      <label className="text-xs font-bold uppercase text-slate-400">Role</label>
+                      <select
+                        className="mt-2 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm"
+                        value={user.role}
+                        disabled={updatingRoleUserId === user.id}
+                        onChange={(event) => changeUserRole(user, event.target.value as "BRANCH_ADMIN" | "BRANCH_STAFF")}
+                      >
+                        <option value="BRANCH_ADMIN">Branch admin</option>
+                        <option value="BRANCH_STAFF">Branch staff</option>
+                      </select>
+                    </div>
+                  )}
                 </div>
               ))}
               {!selectedUsers.length && <EmptyState title="No users assigned" detail="Create a branch admin or staff account for this branch." />}
@@ -1173,6 +1286,22 @@ function BranchDirectory({ branches, branchUsers, visibleBranches, selectedBranc
           <EmptyState title="Select a branch" detail="Branch admins and staff will appear here." />
         )}
       </Card>
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4">
+          <div className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl">
+            <h3 className="text-lg font-bold text-slate-950">Delete branch?</h3>
+            <p className="mt-2 text-sm text-slate-600">
+              This will remove {deleteTarget.name} from active branch lists. Existing orders and audit history will remain available.
+            </p>
+            <div className="mt-5 flex flex-wrap justify-end gap-3">
+              <Button className="bg-white text-[#0b4ea2] ring-1 ring-slate-200 hover:bg-slate-50" disabled={isDeletingBranch} onClick={() => setDeleteTarget(null)}>Cancel</Button>
+              <Button className="bg-red-600 text-white hover:bg-red-700" disabled={isDeletingBranch} onClick={deleteBranch}>
+                <Trash2 className="h-4 w-4" /> {isDeletingBranch ? "Deleting..." : "Delete branch"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

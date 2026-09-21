@@ -53,6 +53,8 @@ Implemented UI:
 - Admin console now has route-backed pages (`/orders`, `/billing`, `/logistics`, `/branches`, `/notifications`, `/audit-logs`, `/settings`) using a shared `AdminConsole` component. Entering a page fetches fresh backend data, and operational pages poll backend data so payment/order status changes appear without manual refresh.
 - Logistics view shows live courier queues with empty states when no matching orders exist.
 - Branch management can create live branches and branch admin/staff users through backend endpoints. Super admins can create branches and branch admins/staff; branch admins can create only staff in their assigned branch.
+- Super admins can delete active branches from the Branches page. The UI opens a confirmation modal before calling `DELETE /api/branches/:id`; the backend soft-deletes the branch so historical orders and audit records remain intact.
+- Super admins can change branch user roles directly from the selected branch user list, switching an existing branch admin/staff account between `BRANCH_ADMIN` and `BRANCH_STAFF`.
 - Branch admin creation calls `POST /api/admin/users`; the backend now returns clear JSON errors for duplicate email, inactive/missing branch, and invalid form data.
 - Admin/customer auth uses one backend `User` table, so an email already registered as a customer cannot be reused for a branch admin/staff account.
 - Branch management loads `GET /api/admin/users` and shows active branches as paginated cards below the forms; selecting a branch shows its assigned branch admin and staff users.
