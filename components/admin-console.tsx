@@ -277,7 +277,7 @@ export function AdminConsole({ page }: { page: AdminPage }) {
               {view === "notifications" && <NotificationsComposer customers={customers} token={token} />}
               {view === "logistics" && <Logistics orders={orders} />}
               {view === "audit" && <AuditLogs token={token} branches={branches} role={role} />}
-              {view === "settings" && <SettingsPanel role={role} />}
+              {view === "settings" && <SettingsPanel role={role} token={token} />}
             </>
           )}
         </div>
@@ -1659,8 +1659,62 @@ function AuditLogs({ token, branches, role }: { token: string; branches: Branch[
   );
 }
 
-function SettingsPanel({ role }: { role: string }) {
-  return <Card className="border-0 p-5 shadow-sm"><h3 className="text-xl font-bold">Settings</h3><p className="mt-2 text-slate-500">{role === "SUPER_ADMIN" ? "Global business settings, branch provisioning, courier billing and admin permissions." : "Branch profile, staff users, service pricing and notification preferences."}</p></Card>;
+function SettingsPanel({ role, token }: { role: string; token: string }) {
+  const { showToast } = useToast();
+  const [form, setForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  async function resetPassword() {
+    if (!form.currentPassword || !form.newPassword || !form.confirmPassword) {
+      showToast({ type: "error", title: "Password details incomplete", message: "Enter your current password, new password, and confirmation." });
+      return;
+    }
+    if (form.newPassword.length < 6) {
+      showToast({ type: "error", title: "Password too short", message: "New password must contain at least 6 characters." });
+      return;
+    }
+    if (form.newPassword !== form.confirmPassword) {
+      showToast({ type: "error", title: "Passwords do not match", message: "Confirm password must match the new password." });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const result = await apiFetch<{ message: string }>("/api/auth/change-password", {
+        method: "POST",
+        body: JSON.stringify({
+          currentPassword: form.currentPassword,
+          newPassword: form.newPassword
+        })
+      }, token);
+      setForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      showToast({ type: "success", title: "Password reset", message: result.message });
+    } catch (error) {
+      showToast({ type: "error", title: "Could not reset password", message: toErrorMessage(error) });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="grid gap-5 xl:grid-cols-[1fr_420px]">
+      <Card className="border-0 p-5 shadow-sm">
+        <h3 className="text-xl font-bold">Settings</h3>
+        <p className="mt-2 text-slate-500">{role === "SUPER_ADMIN" ? "Global business settings, branch provisioning, courier billing and admin permissions." : "Branch profile, staff users, service pricing and notification preferences."}</p>
+      </Card>
+
+      <Card className="border-0 p-5 shadow-sm">
+        <h3 className="text-xl font-bold">Reset password</h3>
+        <p className="mt-2 text-sm text-slate-500">Update your admin password. A confirmation email will be sent after a successful reset.</p>
+        <div className="mt-5 grid gap-3">
+          <Input placeholder="Current password" value={form.currentPassword} onChange={(currentPassword) => setForm({ ...form, currentPassword })} type="password" />
+          <Input placeholder="New password" value={form.newPassword} onChange={(newPassword) => setForm({ ...form, newPassword })} type="password" />
+          <Input placeholder="Confirm new password" value={form.confirmPassword} onChange={(confirmPassword) => setForm({ ...form, confirmPassword })} type="password" />
+          <Button className="h-12" disabled={isSubmitting} onClick={resetPassword}>{isSubmitting ? "Resetting..." : "Reset password"}</Button>
+        </div>
+      </Card>
+    </div>
+  );
 }
 
 function Field({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
